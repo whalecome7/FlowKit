@@ -44,3 +44,52 @@ export interface ExecutionLog {
   triggeredAt: number;
   actions: ActionLog[];
 }
+
+/** 动作参数表单定义 */
+export interface ActionParamMeta {
+  key: string;
+  label: string;
+  placeholder?: string;
+  numeric?: boolean;
+}
+
+/** 动作元数据：驱动编辑 UI 渲染 */
+export interface ActionMeta {
+  type: string;
+  label: string;
+  params: ActionParamMeta[];
+}
+
+export const ACTION_META: ActionMeta[] = [
+  {
+    type: 'notify',
+    label: '状态栏通知',
+    params: [
+      { key: 'title', label: '标题', placeholder: 'FlowKit 提醒' },
+      { key: 'body', label: '正文', placeholder: '收到匹配短信' },
+    ],
+  },
+  {
+    type: 'vibrate',
+    label: '震动',
+    params: [{ key: 'duration', label: '时长(ms)', placeholder: '500', numeric: true }],
+  },
+  {
+    type: 'ringtone',
+    label: '播放铃声',
+    params: [{ key: 'url', label: '铃声地址(可选)', placeholder: '留空使用系统铃声' }],
+  },
+  {
+    type: 'pushToWatch',
+    label: '推送到手表',
+    params: [
+      { key: 'title', label: '标题', placeholder: 'FlowKit 提醒' },
+      { key: 'body', label: '正文', placeholder: '收到匹配短信' },
+    ],
+  },
+];
+
+/** 动作类型 → 元数据 查找 */
+export function getActionMeta(type: string): ActionMeta | undefined {
+  return ACTION_META.find((m) => m.type === type);
+}

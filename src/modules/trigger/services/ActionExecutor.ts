@@ -1,3 +1,5 @@
+import { Vibration } from 'react-native';
+import notifee, { AndroidImportance } from '@notifee/react-native';
 import type { TriggerAction, MatchResult, ActionLog, ExecutionLog } from '../types';
 import { generateId } from '../../../shared/types';
 
@@ -13,33 +15,44 @@ export const ActionExecutor = {
 
   /** 注册内置默认处理器 */
   registerDefaults(): void {
-    // 铃声 - 由原生层实现，这里占位
-    this.registerHandler('ringtone', async (action) => {
-      // TODO: 调用原生 RingtoneModule
-      console.log('[ActionExecutor] ringtone:', action.params);
-      return { success: true };
-    });
-
-    // 震动
+    // 震动：RN 内置 Vibration API
     this.registerHandler('vibrate', async (action) => {
-      // TODO: 调用 Vibration API
-      console.log('[ActionExecutor] vibrate:', action.params);
+      const raw = action.params?.duration;
+      const duration =
+        typeof raw === 'number' && raw > 0 ? raw : 500;
+      Vibration.vibrate(duration);
       return { success: true };
     });
 
-    // 通知
+    // 状态栏通知：Notifee
     this.registerHandler('notify', async (action) => {
-      // TODO: 调用原生 NotificationModule
-      console.log('[ActionExecutor] notify:', action.params);
+      const title = String(action.params?.title ?? 'FlowKit 提醒');
+      const body = String(action.params?.body ?? '');
+      const permission = await notifee.requestPermission();
+      if (permission.authorizationStatus < 2) {
+        return { success: false, error: '通知权限未授权' };
+      }
+      const channelId = await notifee.createChannel({
+        id: 'flowkit-trigger',
+        name: '短信触发器',
+      });
+      await notifee.displayNotification({
+        title,
+        body,
+        android: { channelId, importance: AndroidImportance.HIGH },
+      });
       return { success: true };
     });
 
-    // 推送到手表
-    this.registerHandler('pushToWatch', async (action) => {
-      // TODO: 调用 Wearable API
-      console.log('[ActionExecutor] pushToWatch:', action.params);
-      return { success: true };
-    });
+    // 铃声/推手表：阶段 1 占位，明确失败
+    this.registerHandler('ringtone', async () => ({
+      success: false,
+      error: 'ringtone 动作未实现',
+    }));
+    this.registerHandler('pushToWatch', async () => ({
+      success: false,
+      error: 'pushToWatch 动作未实现',
+    }));
   },
 
   /** 执行匹配结果中的所有动作 */

@@ -77,7 +77,10 @@ export const ACTION_META: ActionMeta[] = [
   {
     type: 'ringtone',
     label: '播放铃声',
-    params: [{ key: 'url', label: '铃声地址(可选)', placeholder: '留空使用系统铃声' }],
+    params: [
+      { key: 'url', label: '铃声地址(可选)', placeholder: '留空使用系统闹钟铃声' },
+      { key: 'duration', label: '响铃时长(ms)', placeholder: '5000', numeric: true },
+    ],
   },
   {
     type: 'pushToWatch',

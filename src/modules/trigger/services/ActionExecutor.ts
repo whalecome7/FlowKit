@@ -1,4 +1,4 @@
-import { Vibration } from 'react-native';
+import { NativeModules, Vibration } from 'react-native';
 import notifee, { AndroidImportance, AuthorizationStatus } from '@notifee/react-native';
 import type { TriggerAction, MatchResult, ActionLog, ExecutionLog } from '../types';
 import { generateId } from '../../../shared/types';
@@ -6,6 +6,8 @@ import { generateId } from '../../../shared/types';
 type ActionHandler = (action: TriggerAction) => Promise<{ success: boolean; error?: string }>;
 
 const actionHandlers = new Map<string, ActionHandler>();
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export const ActionExecutor = {
   /** 注册自定义动作处理器 */
@@ -44,15 +46,51 @@ export const ActionExecutor = {
       return { success: true };
     });
 
-    // 铃声/推手表：阶段 1 占位，明确失败
-    this.registerHandler('ringtone', async () => ({
-      success: false,
-      error: 'ringtone 动作未实现',
-    }));
-    this.registerHandler('pushToWatch', async () => ({
-      success: false,
-      error: 'pushToWatch 动作未实现',
-    }));
+    // 铃声：原生 RingtoneModule（闹钟流，静音也响），duration 后自动停止
+    this.registerHandler('ringtone', async (action) => {
+      const ringtoneModule = NativeModules.RingtoneModule;
+      if (!ringtoneModule) {
+        return { success: false, error: 'RingtoneModule 未注册（iOS 不支持）' };
+      }
+      const url = typeof action.params?.url === 'string' ? action.params.url : null;
+      const raw = action.params?.duration;
+      const duration = typeof raw === 'number' && raw > 0 ? raw : 5000;
+      try {
+        ringtoneModule.play(url);
+        await sleep(duration);
+        ringtoneModule.stop();
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    });
+
+    // 推送到手表：发高重要级通知（华为 Watch 3 / Wear OS 均会镜像到手表）
+    this.registerHandler('pushToWatch', async (action) => {
+      const title = String(action.params?.title ?? 'FlowKit 手表提醒');
+      const body = String(action.params?.body ?? '');
+      const permission = await notifee.requestPermission();
+      if (permission.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
+        return { success: false, error: '通知权限未授权' };
+      }
+      const channelId = await notifee.createChannel({
+        id: 'flowkit-watch',
+        name: '手表提醒',
+      });
+      await notifee.displayNotification({
+        title: `⌚ ${title}`,
+        body,
+        android: {
+          channelId,
+          importance: AndroidImportance.HIGH,
+          pressAction: { id: 'default' },
+        },
+      });
+      return { success: true };
+    });
   },
 
   /** 执行匹配结果中的所有动作 */

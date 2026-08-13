@@ -23,10 +23,32 @@ class RingtoneModule(reactContext: ReactApplicationContext) :
 
   override fun getName(): String = "RingtoneModule"
 
+  /** 是否正在播放铃声（供音量键等场景判断） */
+  companion object {
+    @Volatile
+    private var playing: Boolean = false
+
+    private var instance: RingtoneModule? = null
+
+    fun isPlaying(): Boolean = playing
+
+    /** 由 MainActivity 在音量键事件中调用：停止当前铃声 */
+    fun stopPlaying() {
+      instance?.stop()
+    }
+  }
+
+  init {
+    instance = this
+  }
+
   @ReactMethod
   fun play(url: String?) {
     val ctx = reactApplicationContext
     val audioManager = ctx.getSystemService(AudioManager::class.java) ?: return
+
+    // 0) 若已在播放，先停止旧实例
+    stop()
 
     // 1) 记录并临时拉高闹钟音量（静音/勿扰下也可提醒）
     val stream = AudioManager.STREAM_ALARM
@@ -48,13 +70,16 @@ class RingtoneModule(reactContext: ReactApplicationContext) :
       mp.setDataSource(ctx, uri)
       mp.isLooping = true // 循环播放直到 stop()
       mp.setOnPreparedListener { it.start() }
-      mp.setOnErrorListener { mp, _, _ -> mp.release(); false }
+      mp.setOnErrorListener { mp, _, _ -> playing = false; mp.release(); false }
+      mp.setOnCompletionListener { playing = false }
       mp.prepareAsync()
       player = mp
+      playing = true
     } catch (e: Exception) {
       Log.e("RingtoneModule", "play failed", e)
       restoreVolume(audioManager)
       player = null
+      playing = false
     }
   }
 
@@ -71,6 +96,7 @@ class RingtoneModule(reactContext: ReactApplicationContext) :
       }
     } finally {
       player = null
+      playing = false
       restoreVolume(audioManager)
     }
   }

@@ -1,5 +1,6 @@
 package com.flowkit
 
+import android.view.KeyEvent
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -19,4 +20,19 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  /**
+   * 铃声提醒响起时，按音量减小键可停止铃声（消费事件，不再调音量）。
+   */
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    if (
+      event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN &&
+      event.action == KeyEvent.ACTION_DOWN &&
+      RingtoneModule.isPlaying()
+    ) {
+      RingtoneModule.stopPlaying()
+      return true
+    }
+    return super.dispatchKeyEvent(event)
+  }
 }

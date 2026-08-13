@@ -17,7 +17,7 @@ export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { rules, loadRules, toggleRule, deleteRule } = useTriggerStore();
   const [simulateVisible, setSimulateVisible] = useState(false);
-  const { smsGranted, notifyGranted, batteryExempt, refresh, requestSms, requestNotify, requestBattery } =
+  const { smsGranted, notifyGranted, batteryExempt, checked, refresh, requestSms, requestNotify, requestBattery } =
     usePermissionStore();
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function RuleListScreen() {
 
   return (
     <View style={styles.container}>
-      {(!smsGranted || !notifyGranted || !batteryExempt) && (
+      {checked && (!smsGranted || !notifyGranted || !batteryExempt) && (
         <View style={styles.permissionBar}>
           {!smsGranted && (
             <Text style={styles.permissionText}>⚠️ 缺少短信权限，无法自动触发</Text>

@@ -7,6 +7,8 @@ interface PermissionState {
   smsGranted: boolean;
   notifyGranted: boolean;
   batteryExempt: boolean;
+  /** 是否已完成首次权限状态检查（避免首屏闪烁假警告） */
+  checked: boolean;
   /** 刷新三个权限的真实状态 */
   refresh: () => Promise<void>;
   /** 请求短信权限（返回是否授予） */
@@ -21,6 +23,7 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
   smsGranted: false,
   notifyGranted: false,
   batteryExempt: false,
+  checked: false,
 
   async refresh() {
     let sms = false;
@@ -32,7 +35,7 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
     const settings = await notifee.getNotificationSettings();
     const notify = settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
     const battery = await isBatteryExempt();
-    set({ smsGranted: sms, notifyGranted: notify, batteryExempt: battery });
+    set({ smsGranted: sms, notifyGranted: notify, batteryExempt: battery, checked: true });
   },
 
   async requestSms() {
@@ -41,14 +44,14 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
       PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
     );
     const smsGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
-    set({ smsGranted });
+    set({ smsGranted, checked: true });
     return smsGranted;
   },
 
   async requestNotify() {
     const settings = await notifee.requestPermission();
     const notifyGranted = settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
-    set({ notifyGranted });
+    set({ notifyGranted, checked: true });
     return notifyGranted;
   },
 

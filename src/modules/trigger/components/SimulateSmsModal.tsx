@@ -19,16 +19,22 @@ export default function SimulateSmsModal({ visible, onClose }: Props) {
   const processSms = useTriggerStore((s) => s.processSms);
   const [sender, setSender] = useState('10086');
   const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
 
   const handleSend = async () => {
     if (!body.trim()) {
       Alert.alert('提示', '请输入短信内容');
       return;
     }
-    await processSms(sender.trim() || 'unknown', body.trim());
-    Alert.alert('已模拟', '短信已进入匹配流程，可查看触发日志');
-    setBody('');
-    onClose();
+    setSending(true);
+    try {
+      await processSms(sender.trim() || 'unknown', body.trim());
+      Alert.alert('已模拟', '短信已进入匹配流程，可查看触发日志');
+      setBody('');
+      onClose();
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -58,8 +64,11 @@ export default function SimulateSmsModal({ visible, onClose }: Props) {
             <TouchableOpacity style={[styles.btn, styles.btnCancel]} onPress={onClose}>
               <Text style={styles.btnCancelText}>取消</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnSend]} onPress={handleSend}>
-              <Text style={styles.btnSendText}>发送</Text>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnSend, sending && styles.btnDisabled]}
+              onPress={handleSend}
+              disabled={sending}>
+              <Text style={styles.btnSendText}>{sending ? '发送中...' : '发送'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -96,6 +105,7 @@ const styles = StyleSheet.create({
   btn: { flex: 1, borderRadius: 10, padding: 14, alignItems: 'center' },
   btnCancel: { backgroundColor: '#f0f0f0' },
   btnSend: { backgroundColor: '#4a90d9' },
+  btnDisabled: { opacity: 0.6 },
   btnCancelText: { color: '#555', fontWeight: '600' },
   btnSendText: { color: '#fff', fontWeight: '600' },
 });

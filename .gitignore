@@ -83,3 +83,6 @@ yarn-error.log
 .codebuddy
 .mcp.json
 .superpowers
+
+# WorkBuddy local data
+.workbuddy/

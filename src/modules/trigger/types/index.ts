@@ -55,7 +55,7 @@ export interface ActionParamMeta {
 
 /** 动作元数据：驱动编辑 UI 渲染 */
 export interface ActionMeta {
-  type: string;
+  type: TriggerAction['type'];
   label: string;
   params: ActionParamMeta[];
 }

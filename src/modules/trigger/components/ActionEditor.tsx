@@ -25,7 +25,7 @@ export default function ActionEditor({ action, onChange, onRemove }: Props) {
           <TouchableOpacity
             key={m.type}
             style={[styles.typeItem, action.type === m.type && styles.typeItemActive]}
-            onPress={() => onChange({ type: m.type as TriggerAction['type'], params: {} })}>
+            onPress={() => onChange({ type: m.type, params: {} })}>
             <Text
               style={[styles.typeText, action.type === m.type && styles.typeTextActive]}>
               {m.label}

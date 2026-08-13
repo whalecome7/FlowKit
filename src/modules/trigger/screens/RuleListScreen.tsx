@@ -10,16 +10,25 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTriggerStore } from '../store';
+import { usePermissionStore } from '../services/Permissions';
 import SimulateSmsModal from '../components/SimulateSmsModal';
 
 export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { rules, loadRules, toggleRule, deleteRule } = useTriggerStore();
   const [simulateVisible, setSimulateVisible] = useState(false);
+  const { smsGranted, notifyGranted, batteryExempt, refresh, requestSms, requestNotify, requestBattery } =
+    usePermissionStore();
 
   useEffect(() => {
     loadRules();
   }, [loadRules]);
+
+  useEffect(() => {
+    void refresh();
+    void requestSms();
+    void requestNotify();
+  }, [refresh, requestSms, requestNotify]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -42,6 +51,21 @@ export default function RuleListScreen() {
 
   return (
     <View style={styles.container}>
+      {(!smsGranted || !notifyGranted || !batteryExempt) && (
+        <View style={styles.permissionBar}>
+          {!smsGranted && (
+            <Text style={styles.permissionText}>⚠️ 缺少短信权限，无法自动触发</Text>
+          )}
+          {!notifyGranted && (
+            <Text style={styles.permissionText}>⚠️ 通知未开启，可能收不到提醒</Text>
+          )}
+          {!batteryExempt && (
+            <TouchableOpacity onPress={() => void requestBattery()}>
+              <Text style={styles.permissionAction}>🔋 允许后台运行（防清理）</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
       <FlatList
         data={rules}
         keyExtractor={(item) => item.id}
@@ -97,4 +121,18 @@ const styles = StyleSheet.create({
   ruleName: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
   ruleCond: { fontSize: 13, color: '#888', marginTop: 4 },
   empty: { textAlign: 'center', color: '#999', fontSize: 15, marginTop: 40 },
+  permissionBar: {
+    backgroundColor: '#fff8e1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffe082',
+  },
+  permissionText: { fontSize: 13, color: '#b26a00', marginVertical: 2 },
+  permissionAction: {
+    fontSize: 13,
+    color: '#4a90d9',
+    fontWeight: '600',
+    marginVertical: 2,
+  },
 });

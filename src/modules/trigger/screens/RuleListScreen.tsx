@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,12 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTriggerStore } from '../store';
+import SimulateSmsModal from '../components/SimulateSmsModal';
 
 export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { rules, loadRules, toggleRule, deleteRule } = useTriggerStore();
+  const [simulateVisible, setSimulateVisible] = useState(false);
 
   useEffect(() => {
     loadRules();
@@ -23,6 +25,9 @@ export default function RuleListScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: 'row', gap: 12, marginRight: 8 }}>
+          <TouchableOpacity onPress={() => setSimulateVisible(true)}>
+            <Text style={{ fontSize: 14, color: '#4a90d9' }}>模拟</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('TriggerLog')}>
             <Text style={{ fontSize: 14, color: '#4a90d9' }}>日志</Text>
           </TouchableOpacity>
@@ -63,6 +68,10 @@ export default function RuleListScreen() {
         ListEmptyComponent={
           <Text style={styles.empty}>暂无规则，点击右上角添加</Text>
         }
+      />
+      <SimulateSmsModal
+        visible={simulateVisible}
+        onClose={() => setSimulateVisible(false)}
       />
     </View>
   );

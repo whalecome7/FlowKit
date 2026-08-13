@@ -1,4 +1,4 @@
-import { NativeModules, NativeEventEmitter } from 'react-native';
+import { NativeModules, DeviceEventEmitter } from 'react-native';
 import { useTriggerStore } from '../store';
 
 const { SmsBridge } = NativeModules;
@@ -8,12 +8,14 @@ let initialized = false;
 /**
  * 初始化短信桥接：注册事件监听 + 竞态补发 + 启动保活服务。
  * 在模块注册时调用一次。
+ * 注意：原生模块通过 DeviceEventEmitterModule 发事件，JS 侧必须用
+ * 全局 DeviceEventEmitter 监听（经典 NativeModule 无 addListener，
+ * 用 NativeEventEmitter 会警告并可能在新架构下崩溃）。
  */
 export function initSmsBridge(): void {
   if (!SmsBridge || initialized) return;
 
-  const emitter = new NativeEventEmitter(SmsBridge);
-  emitter.addListener(
+  DeviceEventEmitter.addListener(
     'onSmsReceived',
     (event: { sender: string; body: string }) => {
       void useTriggerStore.getState().processSms(event.sender, event.body);

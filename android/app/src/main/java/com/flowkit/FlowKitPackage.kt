@@ -9,7 +9,10 @@ import com.facebook.react.uimanager.ViewManager
 class FlowKitPackage : ReactPackage {
   override fun createNativeModules(
     reactContext: ReactApplicationContext
-  ): List<NativeModule> = listOf(RingtoneModule(reactContext))
+  ): List<NativeModule> = listOf(
+    RingtoneModule(reactContext),
+    SmsBridgeModule(reactContext),
+  )
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext

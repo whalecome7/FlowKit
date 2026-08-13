@@ -1,5 +1,5 @@
 import { Vibration } from 'react-native';
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, { AndroidImportance, AuthorizationStatus } from '@notifee/react-native';
 import type { TriggerAction, MatchResult, ActionLog, ExecutionLog } from '../types';
 import { generateId } from '../../../shared/types';
 
@@ -29,7 +29,7 @@ export const ActionExecutor = {
       const title = String(action.params?.title ?? 'FlowKit 提醒');
       const body = String(action.params?.body ?? '');
       const permission = await notifee.requestPermission();
-      if (permission.authorizationStatus < 2) {
+      if (permission.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
         return { success: false, error: '通知权限未授权' };
       }
       const channelId = await notifee.createChannel({
@@ -65,7 +65,15 @@ export const ActionExecutor = {
       for (const action of match.rule.actions) {
         const handler = actionHandlers.get(action.type);
         if (handler) {
-          const result = await handler(action);
+          let result: { success: boolean; error?: string };
+          try {
+            result = await handler(action);
+          } catch (err) {
+            result = {
+              success: false,
+              error: err instanceof Error ? err.message : String(err),
+            };
+          }
           actionLogs.push({
             type: action.type,
             success: result.success,

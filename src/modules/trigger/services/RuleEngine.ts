@@ -30,13 +30,13 @@ export const RuleEngine = {
    * 检查单条规则是否匹配短信
    */
   matchRule(rule: TriggerRule, sms: SmsPayload): MatchResult | null {
-    if (!rule.enabled) return null;
+    if (!rule.enabled || rule.conditions.length === 0) return null;
 
     const matchedConditions = rule.conditions.filter((cond) =>
       matchCondition(cond, sms),
     );
 
-    if (matchedConditions.length > 0) {
+    if (matchedConditions.length === rule.conditions.length) {
       return { rule, matchedConditions };
     }
 

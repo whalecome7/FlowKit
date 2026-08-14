@@ -272,26 +272,34 @@ export default function ActionEditor({
               </View>
             )}
             {showInput && (
-              <TextInput
-                style={styles.input}
-                value={currentStr === 'custom' ? '' : currentStr}
-                onChangeText={(text) =>
-                  onChange({
-                    ...action,
-                    params: {
-                      ...action.params,
-                      [param.key]: param.numeric
-                        ? (Number(text) || 0)
-                        : text,
-                    },
-                  })
-                }
-                placeholder={param.placeholder ?? '自定义输入'}
-                placeholderTextColor={colors.textMuted}
-                keyboardType={param.numeric ? 'numeric' : 'default'}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <View>
+                <TextInput
+                  style={styles.input}
+                  value={currentStr === 'custom' ? '' : currentStr}
+                  onChangeText={(text) =>
+                    onChange({
+                      ...action,
+                      params: {
+                        ...action.params,
+                        [param.key]: param.numeric
+                          ? (Number(text) || 0)
+                          : text,
+                      },
+                    })
+                  }
+                  placeholder={param.placeholder ?? '自定义输入'}
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType={param.numeric ? 'numeric' : 'default'}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {param.key === 'speakText' ? (
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 6 }}>
+                    提示：语音播报依赖系统 TTS 引擎。若播报失败，请到系统设置 →
+                    无障碍 → 文字转语音输出，安装并切换可用引擎（如讯飞语记）。
+                  </Text>
+                ) : null}
+              </View>
             )}
           </View>
         );

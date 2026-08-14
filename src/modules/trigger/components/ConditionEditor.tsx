@@ -18,6 +18,8 @@ interface Props {
   condition: TriggerCondition;
   onChange: (condition: TriggerCondition) => void;
   onRemove: () => void;
+  /** 是否显示删除按钮（仅 1 条条件时隐藏） */
+  showDelete?: boolean;
 }
 
 function Segmented<T extends string>({
@@ -77,7 +79,12 @@ function Segmented<T extends string>({
   );
 }
 
-export default function ConditionEditor({ condition, onChange, onRemove }: Props) {
+export default function ConditionEditor({
+  condition,
+  onChange,
+  onRemove,
+  showDelete = true,
+}: Props) {
   const { colors } = useTheme();
   const isRegex = condition.matchType === 'regex';
   const styles = useMemo(
@@ -121,9 +128,11 @@ export default function ConditionEditor({ condition, onChange, onRemove }: Props
           value={condition.field}
           onSelect={(field) => onChange({ ...condition, field })}
         />
-        <TouchableOpacity onPress={onRemove} hitSlop={8}>
-          <Text style={styles.remove}>✕</Text>
-        </TouchableOpacity>
+        {showDelete && (
+          <TouchableOpacity onPress={onRemove} hitSlop={8}>
+            <Text style={styles.remove}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <Segmented
         options={MATCH_TYPES}

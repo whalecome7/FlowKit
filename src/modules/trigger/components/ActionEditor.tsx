@@ -1,5 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  Switch,
+} from 'react-native';
 import { useTheme } from '../../../theme';
 import type { TriggerAction } from '../types';
 import { ACTION_META, getActionMeta } from '../types';
@@ -8,9 +15,22 @@ interface Props {
   action: TriggerAction;
   onChange: (action: TriggerAction) => void;
   onRemove: () => void;
+  /** 动作是否启用 */
+  enabled: boolean;
+  /** 切换启用状态 */
+  onToggleEnabled: (v: boolean) => void;
+  /** 是否显示删除按钮（Modal 内编辑时隐藏） */
+  showDelete?: boolean;
 }
 
-export default function ActionEditor({ action, onChange, onRemove }: Props) {
+export default function ActionEditor({
+  action,
+  onChange,
+  onRemove,
+  enabled,
+  onToggleEnabled,
+  showDelete = true,
+}: Props) {
   const { colors } = useTheme();
   const meta = getActionMeta(action.type) ?? ACTION_META[0];
   const styles = useMemo(
@@ -23,6 +43,12 @@ export default function ActionEditor({ action, onChange, onRemove }: Props) {
           marginBottom: 10,
         },
         row: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        },
+        switchRow: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -84,11 +110,22 @@ export default function ActionEditor({ action, onChange, onRemove }: Props) {
 
   return (
     <View style={styles.card}>
+      <View style={styles.switchRow}>
+        <Text style={styles.label}>启用</Text>
+        <Switch
+          value={enabled}
+          onValueChange={onToggleEnabled}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={colors.primary}
+        />
+      </View>
       <View style={styles.row}>
         <Text style={styles.label}>动作类型</Text>
-        <TouchableOpacity onPress={onRemove} hitSlop={8}>
-          <Text style={styles.remove}>✕</Text>
-        </TouchableOpacity>
+        {showDelete && (
+          <TouchableOpacity onPress={onRemove} hitSlop={8}>
+            <Text style={styles.remove}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <View style={styles.typeRow}>
         {ACTION_META.map((m) => (

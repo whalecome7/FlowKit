@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 
 interface Props {
@@ -17,9 +18,52 @@ interface Props {
 
 export default function SimulateSmsModal({ visible, onClose }: Props) {
   const processSms = useTriggerStore((s) => s.processSms);
+  const { colors } = useTheme();
   const [sender, setSender] = useState('10086');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        overlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          padding: 24,
+        },
+        card: {
+          backgroundColor: colors.surface,
+          borderRadius: 14,
+          padding: 20,
+        },
+        title: {
+          fontSize: 17,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 14,
+        },
+        label: { fontSize: 13, color: colors.textMuted, marginBottom: 6, marginTop: 8 },
+        input: {
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 8,
+          padding: 12,
+          fontSize: 15,
+          color: colors.text,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        bodyInput: { minHeight: 80, textAlignVertical: 'top' },
+        btnRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
+        btn: { flex: 1, borderRadius: 10, padding: 14, alignItems: 'center' },
+        btnCancel: { backgroundColor: colors.surfaceAlt },
+        btnSend: { backgroundColor: colors.primary },
+        btnDisabled: { opacity: 0.6 },
+        btnCancelText: { color: colors.textSecondary, fontWeight: '600' },
+        btnSendText: { color: '#fff', fontWeight: '600' },
+      }),
+    [colors],
+  );
 
   const handleSend = async () => {
     if (!body.trim()) {
@@ -48,7 +92,7 @@ export default function SimulateSmsModal({ visible, onClose }: Props) {
             value={sender}
             onChangeText={setSender}
             placeholder="例如 10086"
-            placeholderTextColor="#ccc"
+            placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
           />
           <Text style={styles.label}>短信内容</Text>
@@ -57,7 +101,7 @@ export default function SimulateSmsModal({ visible, onClose }: Props) {
             value={body}
             onChangeText={setBody}
             placeholder="例如：您的验证码是 123456"
-            placeholderTextColor="#ccc"
+            placeholderTextColor={colors.textMuted}
             multiline
           />
           <View style={styles.btnRow}>
@@ -76,36 +120,3 @@ export default function SimulateSmsModal({ visible, onClose }: Props) {
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 20,
-  },
-  title: { fontSize: 17, fontWeight: '700', color: '#1a1a1a', marginBottom: 14 },
-  label: { fontSize: 13, color: '#888', marginBottom: 6, marginTop: 8 },
-  input: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    color: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  bodyInput: { minHeight: 80, textAlignVertical: 'top' },
-  btnRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  btn: { flex: 1, borderRadius: 10, padding: 14, alignItems: 'center' },
-  btnCancel: { backgroundColor: '#f0f0f0' },
-  btnSend: { backgroundColor: '#4a90d9' },
-  btnDisabled: { opacity: 0.6 },
-  btnCancelText: { color: '#555', fontWeight: '600' },
-  btnSendText: { color: '#fff', fontWeight: '600' },
-});

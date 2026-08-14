@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 
 export default function LogScreen() {
   const { logs, loadLogs } = useTriggerStore();
+  const { colors } = useTheme();
 
   useEffect(() => {
     loadLogs();
@@ -13,6 +15,57 @@ export default function LogScreen() {
     const d = new Date(ts);
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.background },
+        list: { padding: 16 },
+        logCard: {
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 3,
+          elevation: 1,
+        },
+        logHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        },
+        logRuleName: { fontSize: 16, fontWeight: '600', color: colors.text },
+        logTime: { fontSize: 13, color: colors.textMuted },
+        logSender: { fontSize: 14, color: colors.textSecondary, marginBottom: 4 },
+        logBody: { fontSize: 14, color: colors.textMuted, marginBottom: 8 },
+        logActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+        actionTag: {
+          fontSize: 12,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: 4,
+          overflow: 'hidden',
+        },
+        actionSuccess: {
+          backgroundColor: colors.success,
+          color: '#fff',
+        },
+        actionFail: {
+          backgroundColor: colors.danger,
+          color: '#fff',
+        },
+        empty: {
+          textAlign: 'center',
+          color: colors.textMuted,
+          fontSize: 15,
+          marginTop: 40,
+        },
+      }),
+    [colors],
+  );
 
   return (
     <View style={styles.container}>
@@ -51,45 +104,3 @@ export default function LogScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  list: { padding: 16 },
-  logCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  logHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  logRuleName: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
-  logTime: { fontSize: 13, color: '#999' },
-  logSender: { fontSize: 14, color: '#666', marginBottom: 4 },
-  logBody: { fontSize: 14, color: '#888', marginBottom: 8 },
-  logActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  actionTag: {
-    fontSize: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  actionSuccess: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-  },
-  actionFail: {
-    backgroundColor: '#fce4ec',
-    color: '#c62828',
-  },
-  empty: { textAlign: 'center', color: '#999', fontSize: 15, marginTop: 40 },
-});

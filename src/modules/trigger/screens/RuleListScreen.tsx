@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 import { usePermissionStore } from '../services/Permissions';
 import SimulateSmsModal from '../components/SimulateSmsModal';
 
 export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { colors } = useTheme();
   const { rules, loadRules, toggleRule, deleteRule } = useTriggerStore();
   const [simulateVisible, setSimulateVisible] = useState(false);
   const { smsGranted, notifyGranted, batteryExempt, checked, refresh, requestSms, requestNotify, requestBattery } =
@@ -35,19 +37,64 @@ export default function RuleListScreen() {
       headerRight: () => (
         <View style={{ flexDirection: 'row', gap: 12, marginRight: 8 }}>
           <TouchableOpacity onPress={() => setSimulateVisible(true)}>
-            <Text style={{ fontSize: 14, color: '#4a90d9' }}>模拟</Text>
+            <Text style={{ fontSize: 14, color: colors.primary }}>模拟</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('TriggerLog')}>
-            <Text style={{ fontSize: 14, color: '#4a90d9' }}>日志</Text>
+            <Text style={{ fontSize: 14, color: colors.primary }}>日志</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('TriggerRuleEdit', {})}>
-            <Text style={{ fontSize: 20, color: '#4a90d9' }}>+</Text>
+            <Text style={{ fontSize: 20, color: colors.primary }}>+</Text>
           </TouchableOpacity>
         </View>
       ),
     });
-  }, [navigation]);
+  }, [navigation, colors]);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.background },
+        list: { padding: 16 },
+        card: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 3,
+          elevation: 1,
+        },
+        cardLeft: { flex: 1 },
+        ruleName: { fontSize: 16, fontWeight: '600', color: colors.text },
+        ruleCond: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
+        empty: {
+          textAlign: 'center',
+          color: colors.textMuted,
+          fontSize: 15,
+          marginTop: 40,
+        },
+        permissionBar: {
+          backgroundColor: colors.warningBg,
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.warning,
+        },
+        permissionText: { fontSize: 13, color: colors.warning, marginVertical: 2 },
+        permissionAction: {
+          fontSize: 13,
+          color: colors.primary,
+          fontWeight: '600',
+          marginVertical: 2,
+        },
+      }),
+    [colors],
+  );
 
   return (
     <View style={styles.container}>
@@ -100,39 +147,3 @@ export default function RuleListScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  list: { padding: 16 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  cardLeft: { flex: 1 },
-  ruleName: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
-  ruleCond: { fontSize: 13, color: '#888', marginTop: 4 },
-  empty: { textAlign: 'center', color: '#999', fontSize: 15, marginTop: 40 },
-  permissionBar: {
-    backgroundColor: '#fff8e1',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ffe082',
-  },
-  permissionText: { fontSize: 13, color: '#b26a00', marginVertical: 2 },
-  permissionAction: {
-    fontSize: 13,
-    color: '#4a90d9',
-    fontWeight: '600',
-    marginVertical: 2,
-  },
-});

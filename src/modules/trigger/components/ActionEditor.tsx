@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTheme } from '../../../theme';
 import type { TriggerAction } from '../types';
 import { ACTION_META, getActionMeta } from '../types';
 
@@ -10,7 +11,76 @@ interface Props {
 }
 
 export default function ActionEditor({ action, onChange, onRemove }: Props) {
+  const { colors } = useTheme();
   const meta = getActionMeta(action.type) ?? ACTION_META[0];
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 14,
+          marginBottom: 10,
+        },
+        row: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        },
+        label: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.textSecondary,
+        },
+        remove: {
+          fontSize: 16,
+          color: colors.danger,
+          padding: 4,
+        },
+        typeRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 12,
+        },
+        typeItem: {
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 16,
+          backgroundColor: colors.surfaceAlt,
+        },
+        typeItemActive: {
+          backgroundColor: colors.primary,
+        },
+        typeText: {
+          fontSize: 13,
+          color: colors.textSecondary,
+        },
+        typeTextActive: {
+          color: '#fff',
+          fontWeight: '600',
+        },
+        paramRow: {
+          marginBottom: 8,
+        },
+        paramLabel: {
+          fontSize: 13,
+          color: colors.textMuted,
+          marginBottom: 4,
+        },
+        input: {
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 8,
+          padding: 10,
+          fontSize: 15,
+          color: colors.text,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+      }),
+    [colors],
+  );
 
   return (
     <View style={styles.card}>
@@ -51,7 +121,7 @@ export default function ActionEditor({ action, onChange, onRemove }: Props) {
               })
             }
             placeholder={param.placeholder}
-            placeholderTextColor="#ccc"
+            placeholderTextColor={colors.textMuted}
             keyboardType={param.numeric ? 'numeric' : 'default'}
             autoCapitalize="none"
             autoCorrect={false}
@@ -61,68 +131,3 @@ export default function ActionEditor({ action, onChange, onRemove }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
-  },
-  remove: {
-    fontSize: 16,
-    color: '#c62828',
-    padding: 4,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  typeItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
-  },
-  typeItemActive: {
-    backgroundColor: '#4a90d9',
-  },
-  typeText: {
-    fontSize: 13,
-    color: '#555',
-  },
-  typeTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  paramRow: {
-    marginBottom: 8,
-  },
-  paramLabel: {
-    fontSize: 13,
-    color: '#888',
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
-    color: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-});

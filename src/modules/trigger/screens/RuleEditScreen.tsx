@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 import type { TriggerCondition, TriggerAction } from '../types';
 import ConditionEditor from '../components/ConditionEditor';
@@ -23,6 +24,7 @@ export default function RuleEditScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'TriggerRuleEdit'>>();
   const { rules, addRule, updateRule } = useTriggerStore();
+  const { colors } = useTheme();
 
   const ruleId = route.params?.ruleId;
   const existingRule = ruleId ? rules.find((r) => r.id === ruleId) : undefined;
@@ -100,6 +102,54 @@ export default function RuleEditScreen() {
     }
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.background },
+        content: { padding: 16, paddingBottom: 40 },
+        sectionHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: 20,
+          marginBottom: 10,
+        },
+        sectionTitle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.textMuted,
+        },
+        addButton: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.primary,
+        },
+        input: {
+          backgroundColor: colors.surface,
+          borderRadius: 10,
+          padding: 14,
+          fontSize: 16,
+          color: colors.text,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        empty: {
+          fontSize: 13,
+          color: colors.textMuted,
+          marginBottom: 10,
+        },
+        saveButton: {
+          backgroundColor: colors.primary,
+          borderRadius: 10,
+          padding: 16,
+          alignItems: 'center',
+          marginTop: 28,
+        },
+        saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+      }),
+    [colors],
+  );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.sectionTitle}>规则名称</Text>
@@ -108,7 +158,7 @@ export default function RuleEditScreen() {
         value={name}
         onChangeText={setName}
         placeholder="例如：银行验证码"
-        placeholderTextColor="#ccc"
+        placeholderTextColor={colors.textMuted}
       />
 
       <View style={styles.sectionHeader}>
@@ -153,47 +203,3 @@ export default function RuleEditScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  content: { padding: 16, paddingBottom: 40 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888',
-  },
-  addButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4a90d9',
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    color: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  empty: {
-    fontSize: 13,
-    color: '#bbb',
-    marginBottom: 10,
-  },
-  saveButton: {
-    backgroundColor: '#4a90d9',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-});

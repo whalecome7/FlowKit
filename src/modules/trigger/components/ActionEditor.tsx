@@ -154,11 +154,12 @@ export default function ActionEditor({
       {meta.params.map((param) => {
         const current = action.params?.[param.key];
         const currentStr = current != null ? String(current) : '';
-        // 输入框显示条件：无预制选项，或当前值是「自定义」标记，或当前值不是任何内置预制值（用户自定义内容）
+        // 输入框显示条件：禁用手填的参数不显示；否则无预制选项、或值是「自定义」标记、或值不是任何内置预制值（自定义内容）时显示
         const showInput =
-          !param.presets ||
-          currentStr === 'custom' ||
-          !param.presets.some((p) => p.value !== 'custom' && p.value === currentStr);
+          !param.disableInput &&
+          (!param.presets ||
+            currentStr === 'custom' ||
+            !param.presets.some((p) => p.value !== 'custom' && p.value === currentStr));
         return (
           <View key={param.key} style={styles.paramRow}>
             <Text style={styles.paramLabel}>{param.label}</Text>

@@ -53,6 +53,8 @@ export interface ActionParamMeta {
   label: string;
   placeholder?: string;
   numeric?: boolean;
+  /** 枚举型参数：永不显示自定义输入框 */
+  disableInput?: boolean;
   /** 预制选项（chips），用户可直接点选，仍保留自定义输入 */
   presets?: { label: string; value: string }[];
 }
@@ -80,7 +82,8 @@ export const ACTION_META: ActionMeta[] = [
       {
         key: 'mode',
         label: '模式',
-        placeholder: '自定义模式，如 standard',
+        // 枚举型：选「自定义」时实际内容由节奏/力度参数填写，不显示输入框
+        disableInput: true,
         presets: [
           { label: '轻柔', value: 'gentle' },
           { label: '标准', value: 'standard' },

@@ -8,6 +8,11 @@ FlowKit 是一个 React Native 个人工具集应用，中文名"流光"。面�
 
 **技术栈：** React Native CLI（裸工作流）、TypeScript、React Navigation（Stack）、Zustand、AsyncStorage
 
+## 语言与提交约定
+
+- **所有输出一律使用中文**（包括对用户的回复、文档、注释、计划等）
+- **git commit 文案用简短中文**，遵循约定式提交风格（如 `feat: 新增主题切换`、`fix: 修复日志覆盖丢失`）
+
 ## 目录约定
 
 ```

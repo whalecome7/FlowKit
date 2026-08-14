@@ -110,7 +110,7 @@ export const ACTION_META: ActionMeta[] = [
     type: 'ringtone',
     label: '播放铃声',
     params: [
-      { key: 'url', label: '铃声文件', filePicker: 'audio' },
+      { key: 'url', label: '铃声文件（可选）', filePicker: 'audio' },
       { key: 'duration', label: '响铃时长(ms)', placeholder: '5000', numeric: true },
     ],
   },

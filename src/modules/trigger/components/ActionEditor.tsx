@@ -209,7 +209,11 @@ export default function ActionEditor({
                     清除（恢复系统默认铃声）
                   </Text>
                 </TouchableOpacity>
-              ) : null}
+              ) : (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
+                  可选：不选择则使用系统默认闹钟铃声
+                </Text>
+              )}
             </View>
           );
         }

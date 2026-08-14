@@ -103,6 +103,8 @@ android {
     }
     buildTypes {
         debug {
+            // debug 版独立包名（com.flowkit.debug），可与正式版共存
+            applicationIdSuffix ".debug"
             signingConfig signingConfigs.debug
         }
         release {

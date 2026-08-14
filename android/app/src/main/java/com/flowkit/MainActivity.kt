@@ -23,6 +23,8 @@ class MainActivity : ReactActivity() {
 
   /**
    * 铃声提醒响起时，按音量减小键可停止铃声（消费事件，不再调音量）。
+   * 注：小米等 ROM 在系统层拦截音量键（此方法收不到），主路径是
+   * RingtoneModule 的 MediaSession 音量路由；此方法作为标准 ROM 的补充。
    */
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {
     if (

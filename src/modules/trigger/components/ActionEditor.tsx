@@ -154,10 +154,11 @@ export default function ActionEditor({
       {meta.params.map((param) => {
         const current = action.params?.[param.key];
         const currentStr = current != null ? String(current) : '';
-        // 有预制选项时，仅当当前值不是任何预制值（选了自定义或已输入自定义内容）才显示输入框
+        // 输入框显示条件：无预制选项，或当前值是「自定义」标记，或当前值不是任何内置预制值（用户自定义内容）
         const showInput =
           !param.presets ||
-          !param.presets.some((p) => p.value === currentStr);
+          currentStr === 'custom' ||
+          !param.presets.some((p) => p.value !== 'custom' && p.value === currentStr);
         return (
           <View key={param.key} style={styles.paramRow}>
             <Text style={styles.paramLabel}>{param.label}</Text>
@@ -173,7 +174,13 @@ export default function ActionEditor({
                           ...action,
                           params: {
                             ...action.params,
-                            [param.key]: param.numeric ? Number(p.value) : p.value,
+                            // 「自定义」存字符串标记 custom；其余按类型存储
+                            [param.key]:
+                              p.value === 'custom'
+                                ? 'custom'
+                                : param.numeric
+                                  ? Number(p.value)
+                                  : p.value,
                           },
                         })
                       }

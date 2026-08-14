@@ -12,6 +12,7 @@ class FlowKitPackage : ReactPackage {
   ): List<NativeModule> = listOf(
     RingtoneModule(reactContext),
     SmsBridgeModule(reactContext),
+    VibrationModule(reactContext),
   )
 
   override fun createViewManagers(

@@ -17,12 +17,36 @@ export const ActionExecutor = {
 
   /** 注册内置默认处理器 */
   registerDefaults(): void {
-    // 震动：RN 内置 Vibration API
+    // 震动：优先原生 VibrationModule（支持模式/节奏/力度），无原生时降级 RN Vibration
     this.registerHandler('vibrate', async (action) => {
-      const raw = action.params?.duration;
-      const duration =
-        typeof raw === 'number' && raw > 0 ? raw : 500;
-      Vibration.vibrate(duration);
+      const params = action.params ?? {};
+      const mode = String(params.mode ?? 'standard');
+      const patternRaw = typeof params.pattern === 'string' ? params.pattern : '';
+      const amplitude = typeof params.amplitude === 'number' ? params.amplitude : 0;
+      let pattern: string;
+      switch (mode) {
+        case 'gentle':
+          pattern = '100';
+          break;
+        case 'urgent':
+          pattern = '200,80,200,80,300';
+          break;
+        case 'custom':
+          pattern = patternRaw || '200,100,200';
+          break;
+        case 'standard':
+        default:
+          pattern = '300';
+          break;
+      }
+      const nativeVibrate = NativeModules.VibrationModule;
+      if (nativeVibrate) {
+        nativeVibrate.vibrate(pattern, amplitude);
+        return { success: true };
+      }
+      // 降级：RN 内置 Vibration
+      const parts = pattern.split(',').map((p) => Number(p) || 0);
+      Vibration.vibrate(parts.length > 1 ? parts : parts[0], false);
       return { success: true };
     });
 

@@ -74,7 +74,11 @@ export const ACTION_META: ActionMeta[] = [
   {
     type: 'vibrate',
     label: '震动',
-    params: [{ key: 'duration', label: '时长(ms)', placeholder: '500', numeric: true }],
+    params: [
+      { key: 'mode', label: '模式', placeholder: 'gentle|standard|urgent|custom' },
+      { key: 'pattern', label: '节奏(ms,逗号分隔)', placeholder: '如 200,100,200' },
+      { key: 'amplitude', label: '力度(1-255)', placeholder: '留空自动', numeric: true },
+    ],
   },
   {
     type: 'ringtone',

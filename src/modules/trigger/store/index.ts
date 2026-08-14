@@ -16,6 +16,7 @@ interface TriggerState {
   updateRule: (id: string, updates: Partial<TriggerRule>) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
   toggleRule: (id: string) => Promise<void>;
+  duplicateRule: (id: string) => Promise<void>;
   loadLogs: () => Promise<void>;
   processSms: (sender: string, body: string) => Promise<void>;
 }
@@ -59,6 +60,20 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     const rules = get().rules.map((r) =>
       r.id === id ? { ...r, enabled: !r.enabled } : r,
     );
+    await RuleStorage.saveRules(rules);
+    set({ rules });
+  },
+
+  async duplicateRule(id) {
+    const rule = get().rules.find((r) => r.id === id);
+    if (!rule) return;
+    const copy: TriggerRule = {
+      ...rule,
+      id: generateId(),
+      name: `${rule.name} 副本`,
+      createdAt: Date.now(),
+    };
+    const rules = [...get().rules, copy];
     await RuleStorage.saveRules(rules);
     set({ rules });
   },

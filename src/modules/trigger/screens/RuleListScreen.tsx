@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,7 +18,8 @@ import SimulateSmsModal from '../components/SimulateSmsModal';
 export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { colors } = useTheme();
-  const { rules, loadRules, toggleRule, deleteRule } = useTriggerStore();
+  const { rules, loadRules, toggleRule, deleteRule, duplicateRule } =
+    useTriggerStore();
   const [simulateVisible, setSimulateVisible] = useState(false);
   const { smsGranted, notifyGranted, batteryExempt, checked, refresh, requestSms, requestNotify, requestBattery } =
     usePermissionStore();
@@ -123,7 +125,13 @@ export default function RuleListScreen() {
             activeOpacity={0.7}
             onPress={() =>
               navigation.navigate('TriggerRuleEdit', { ruleId: item.id })
-            }>
+            }
+            onLongPress={() => {
+              Alert.alert('复制规则', `复制「${item.name}」？`, [
+                { text: '取消', style: 'cancel' },
+                { text: '复制', onPress: () => void duplicateRule(item.id) },
+              ]);
+            }}>
             <View style={styles.cardLeft}>
               <Text style={styles.ruleName}>{item.name}</Text>
               <Text style={styles.ruleCond}>

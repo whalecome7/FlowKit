@@ -7,20 +7,25 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
+import { exportRules, parseRules } from '../services/RuleExport';
 import { usePermissionStore } from '../services/Permissions';
 import SimulateSmsModal from '../components/SimulateSmsModal';
 
 export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { colors } = useTheme();
-  const { rules, loadRules, toggleRule, deleteRule, duplicateRule } =
+  const { rules, loadRules, toggleRule, deleteRule, duplicateRule, addRule } =
     useTriggerStore();
   const [simulateVisible, setSimulateVisible] = useState(false);
+  const [importVisible, setImportVisible] = useState(false);
+  const [importText, setImportText] = useState('');
   const { smsGranted, notifyGranted, batteryExempt, checked, refresh, requestSms, requestNotify, requestBattery } =
     usePermissionStore();
 
@@ -47,6 +52,16 @@ export default function RuleListScreen() {
           <TouchableOpacity
             onPress={() => navigation.navigate('TriggerRuleEdit', {})}>
             <Text style={{ fontSize: 20, color: colors.primary }}>+</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => void exportRules(rules)}>
+            <Text style={{ fontSize: 14, color: colors.primary }}>导出</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setImportText('');
+              setImportVisible(true);
+            }}>
+            <Text style={{ fontSize: 14, color: colors.primary }}>导入</Text>
           </TouchableOpacity>
         </View>
       ),
@@ -152,6 +167,92 @@ export default function RuleListScreen() {
         visible={simulateVisible}
         onClose={() => setSimulateVisible(false)}
       />
+      <Modal
+        visible={importVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImportVisible(false)}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            padding: 24,
+          }}>
+          <View
+            style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 20 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '500',
+                color: colors.text,
+                marginBottom: 12,
+              }}>
+              导入规则
+            </Text>
+            <TextInput
+              value={importText}
+              onChangeText={setImportText}
+              placeholder="粘贴导出的规则 JSON"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={{
+                backgroundColor: colors.surfaceAlt,
+                color: colors.text,
+                borderRadius: 8,
+                padding: 12,
+                minHeight: 140,
+                textAlignVertical: 'top',
+              }}
+            />
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                gap: 12,
+                marginTop: 16,
+              }}>
+              <TouchableOpacity onPress={() => setImportVisible(false)}>
+                <Text style={{ color: colors.textSecondary, fontSize: 14, padding: 8 }}>
+                  取消
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  const { error, rules: imported } = parseRules(importText);
+                  if (error) {
+                    Alert.alert('导入失败', error);
+                    return;
+                  }
+                  if (imported.length === 0) {
+                    Alert.alert('导入失败', '未解析到任何规则');
+                    return;
+                  }
+                  for (const r of imported) {
+                    await addRule({
+                      name: r.name,
+                      enabled: r.enabled ?? true,
+                      conditions: r.conditions,
+                      actions: r.actions,
+                    });
+                  }
+                  setImportVisible(false);
+                  Alert.alert('导入成功', `已导入 ${imported.length} 条规则`);
+                }}>
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontSize: 14,
+                    fontWeight: '500',
+                    padding: 8,
+                  }}>
+                  导入
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

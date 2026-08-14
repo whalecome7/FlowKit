@@ -26,6 +26,7 @@ export default function RuleListScreen() {
   const [simulateVisible, setSimulateVisible] = useState(false);
   const [importVisible, setImportVisible] = useState(false);
   const [importText, setImportText] = useState('');
+  const [moreVisible, setMoreVisible] = useState(false);
   const { smsGranted, notifyGranted, batteryExempt, checked, refresh, requestSms, requestNotify, requestBattery } =
     usePermissionStore();
 
@@ -47,38 +48,45 @@ export default function RuleListScreen() {
             onPress={() => navigation.navigate('TriggerRuleEdit', {})}>
             <Text style={{ fontSize: 20, color: colors.primary, lineHeight: 20 }}>＋</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={showMoreMenu}>
+          <TouchableOpacity onPress={() => setMoreVisible(true)}>
             <Text style={{ fontSize: 18, color: colors.primary, lineHeight: 20 }}>⋯</Text>
           </TouchableOpacity>
         </View>
       ),
     });
-  }, [navigation, colors, rules]);
+  }, [navigation, colors]);
 
-  const showMoreMenu = () => {
-    Alert.alert('更多', undefined, [
-      {
-        text: '模拟短信',
-        onPress: () => setSimulateVisible(true),
+  const moreItems = [
+    {
+      label: '模拟短信',
+      onPress: () => {
+        setMoreVisible(false);
+        setSimulateVisible(true);
       },
-      {
-        text: '触发日志',
-        onPress: () => navigation.navigate('TriggerLog'),
+    },
+    {
+      label: '触发日志',
+      onPress: () => {
+        setMoreVisible(false);
+        navigation.navigate('TriggerLog');
       },
-      {
-        text: '导出规则',
-        onPress: () => void exportRules(rules),
+    },
+    {
+      label: '导出规则',
+      onPress: () => {
+        setMoreVisible(false);
+        void exportRules(rules);
       },
-      {
-        text: '导入规则',
-        onPress: () => {
-          setImportText('');
-          setImportVisible(true);
-        },
+    },
+    {
+      label: '导入规则',
+      onPress: () => {
+        setMoreVisible(false);
+        setImportText('');
+        setImportVisible(true);
       },
-      { text: '取消', style: 'cancel' },
-    ]);
-  };
+    },
+  ];
 
   const styles = useMemo(
     () =>
@@ -264,6 +272,56 @@ export default function RuleListScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* 更多操作菜单：底部面板，点空白或 ✕ 关闭 */}
+      <Modal
+        visible={moreVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMoreVisible(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setMoreVisible(false)}>
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingBottom: 32,
+              paddingTop: 10,
+            }}>
+            <View
+              style={{
+                alignSelf: 'center',
+                width: 40,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: colors.border,
+                marginBottom: 8,
+              }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 12 }}>
+              <TouchableOpacity onPress={() => setMoreVisible(false)} hitSlop={8} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 16, color: colors.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {moreItems.map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                onPress={item.onPress}
+                style={{
+                  paddingVertical: 14,
+                  paddingHorizontal: 24,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border,
+                }}>
+                <Text style={{ fontSize: 15, color: colors.text }}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

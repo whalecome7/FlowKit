@@ -95,6 +95,17 @@ export default function ActionEditor({
           color: colors.textMuted,
           marginBottom: 4,
         },
+        presetRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 8,
+        },
+        presetChip: {
+          borderRadius: 14,
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+        },
         input: {
           backgroundColor: colors.surfaceAlt,
           borderRadius: 8,
@@ -140,31 +151,67 @@ export default function ActionEditor({
           </TouchableOpacity>
         ))}
       </View>
-      {meta.params.map((param) => (
-        <View key={param.key} style={styles.paramRow}>
-          <Text style={styles.paramLabel}>{param.label}</Text>
-          <TextInput
-            style={styles.input}
-            value={action.params?.[param.key] != null ? String(action.params[param.key]) : ''}
-            onChangeText={(text) =>
-              onChange({
-                ...action,
-                params: {
-                  ...action.params,
-                  [param.key]: param.numeric
-                    ? (Number(text) || 0)
-                    : text,
-                },
-              })
-            }
-            placeholder={param.placeholder}
-            placeholderTextColor={colors.textMuted}
-            keyboardType={param.numeric ? 'numeric' : 'default'}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-      ))}
+      {meta.params.map((param) => {
+        const current = action.params?.[param.key];
+        const currentStr = current != null ? String(current) : '';
+        return (
+          <View key={param.key} style={styles.paramRow}>
+            <Text style={styles.paramLabel}>{param.label}</Text>
+            {param.presets && (
+              <View style={styles.presetRow}>
+                {param.presets.map((p) => {
+                  const active = currentStr === p.value;
+                  return (
+                    <TouchableOpacity
+                      key={p.label}
+                      onPress={() =>
+                        onChange({
+                          ...action,
+                          params: {
+                            ...action.params,
+                            [param.key]: param.numeric ? Number(p.value) : p.value,
+                          },
+                        })
+                      }
+                      style={[
+                        styles.presetChip,
+                        { backgroundColor: active ? colors.primary : colors.surfaceAlt },
+                      ]}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: active ? '#fff' : colors.textSecondary,
+                        }}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+            <TextInput
+              style={styles.input}
+              value={currentStr}
+              onChangeText={(text) =>
+                onChange({
+                  ...action,
+                  params: {
+                    ...action.params,
+                    [param.key]: param.numeric
+                      ? (Number(text) || 0)
+                      : text,
+                  },
+                })
+              }
+              placeholder={param.placeholder ?? '自定义输入'}
+              placeholderTextColor={colors.textMuted}
+              keyboardType={param.numeric ? 'numeric' : 'default'}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        );
+      })}
     </View>
   );
 }

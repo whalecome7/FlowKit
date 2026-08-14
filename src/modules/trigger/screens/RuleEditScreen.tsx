@@ -222,12 +222,22 @@ export default function RuleEditScreen() {
           borderRadius: 14,
           padding: 18,
         },
+        modalHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        },
         modalTitle: {
           fontSize: 16,
           fontWeight: '600',
           color: colors.text,
           textAlign: 'center',
-          marginBottom: 12,
+        },
+        modalClose: {
+          fontSize: 16,
+          color: colors.textMuted,
+          padding: 4,
         },
         doneButton: {
           backgroundColor: colors.primary,
@@ -361,7 +371,12 @@ export default function RuleEditScreen() {
       onRequestClose={closeModal}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>编辑条件</Text>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>编辑条件</Text>
+            <TouchableOpacity onPress={closeModal} hitSlop={8}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
           {draftCondition && (
             <ConditionEditor
               condition={draftCondition}
@@ -384,7 +399,12 @@ export default function RuleEditScreen() {
       onRequestClose={closeModal}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>编辑动作</Text>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>编辑动作</Text>
+            <TouchableOpacity onPress={closeModal} hitSlop={8}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
           {draftAction && (
             <ActionEditor
               action={draftAction}

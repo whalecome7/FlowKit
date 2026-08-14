@@ -53,6 +53,8 @@ export interface ActionParamMeta {
   label: string;
   placeholder?: string;
   numeric?: boolean;
+  /** 预制选项（chips），用户可直接点选，仍保留自定义输入 */
+  presets?: { label: string; value: string }[];
 }
 
 /** 动作元数据：驱动编辑 UI 渲染 */
@@ -75,9 +77,35 @@ export const ACTION_META: ActionMeta[] = [
     type: 'vibrate',
     label: '震动',
     params: [
-      { key: 'mode', label: '模式', placeholder: 'gentle|standard|urgent|custom' },
-      { key: 'pattern', label: '节奏(ms,逗号分隔)', placeholder: '如 200,100,200' },
-      { key: 'amplitude', label: '力度(1-255)', placeholder: '留空自动', numeric: true },
+      {
+        key: 'mode',
+        label: '模式',
+        presets: [
+          { label: '轻柔', value: 'gentle' },
+          { label: '标准', value: 'standard' },
+          { label: '急促', value: 'urgent' },
+          { label: '自定义', value: 'custom' },
+        ],
+      },
+      {
+        key: 'pattern',
+        label: '节奏',
+        presets: [
+          { label: '轻震 100ms', value: '100' },
+          { label: '标准 300ms', value: '300' },
+          { label: '急促连震', value: '200,80,200,80,300' },
+        ],
+      },
+      {
+        key: 'amplitude',
+        label: '力度',
+        numeric: true,
+        presets: [
+          { label: '轻柔 60', value: '60' },
+          { label: '标准 120', value: '120' },
+          { label: '强力 200', value: '200' },
+        ],
+      },
     ],
   },
   {

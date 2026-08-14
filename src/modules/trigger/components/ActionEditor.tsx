@@ -221,6 +221,9 @@ export default function ActionEditor({
                   可选：不选择则使用系统默认闹钟铃声
                 </Text>
               )}
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                提示：想播放指定语音，可先用讯飞语记等工具把文字转成音频文件，再在此选择播放
+              </Text>
             </View>
           );
         }

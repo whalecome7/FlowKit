@@ -7,6 +7,7 @@ import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
 import { ThemeProvider } from '../theme';
+import { navigationRef } from '../modules/trigger/services/NotificationNavigation';
 
 // 注册所有模块
 registerTriggerModule();
@@ -16,7 +17,7 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   return (
     <ThemeProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator initialRouteName="Home">
           <Stack.Screen
             name="Home"

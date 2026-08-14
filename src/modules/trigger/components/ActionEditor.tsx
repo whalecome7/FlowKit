@@ -154,6 +154,10 @@ export default function ActionEditor({
       {meta.params.map((param) => {
         const current = action.params?.[param.key];
         const currentStr = current != null ? String(current) : '';
+        // 有预制选项时，仅当当前值不是任何预制值（选了自定义或已输入自定义内容）才显示输入框
+        const showInput =
+          !param.presets ||
+          !param.presets.some((p) => p.value === currentStr);
         return (
           <View key={param.key} style={styles.paramRow}>
             <Text style={styles.paramLabel}>{param.label}</Text>
@@ -189,26 +193,28 @@ export default function ActionEditor({
                 })}
               </View>
             )}
-            <TextInput
-              style={styles.input}
-              value={currentStr}
-              onChangeText={(text) =>
-                onChange({
-                  ...action,
-                  params: {
-                    ...action.params,
-                    [param.key]: param.numeric
-                      ? (Number(text) || 0)
-                      : text,
-                  },
-                })
-              }
-              placeholder={param.placeholder ?? '自定义输入'}
-              placeholderTextColor={colors.textMuted}
-              keyboardType={param.numeric ? 'numeric' : 'default'}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            {showInput && (
+              <TextInput
+                style={styles.input}
+                value={currentStr === 'custom' ? '' : currentStr}
+                onChangeText={(text) =>
+                  onChange({
+                    ...action,
+                    params: {
+                      ...action.params,
+                      [param.key]: param.numeric
+                        ? (Number(text) || 0)
+                        : text,
+                    },
+                  })
+                }
+                placeholder={param.placeholder ?? '自定义输入'}
+                placeholderTextColor={colors.textMuted}
+                keyboardType={param.numeric ? 'numeric' : 'default'}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
           </View>
         );
       })}

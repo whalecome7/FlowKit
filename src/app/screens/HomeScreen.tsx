@@ -9,6 +9,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { moduleRegistry } from '../module-registry';
+import { useTheme } from '../../theme';
 
 type RootStackParamList = {
   Home: undefined;
@@ -18,10 +19,18 @@ type HomeNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 export default function HomeScreen() {
   const navigation = useNavigation<HomeNavigationProp>();
+  const { cycleMode, mode, colors } = useTheme();
   const modules = moduleRegistry.getEnabledModules();
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        onPress={cycleMode}
+        style={{ padding: 8, alignSelf: 'flex-end', marginRight: 16 }}>
+        <Text style={{ color: colors.primary, fontSize: 14 }}>
+          {mode === 'light' ? '浅色' : mode === 'dark' ? '深色' : '自适应'}
+        </Text>
+      </TouchableOpacity>
       <Text style={styles.title}>FlowKit</Text>
       <Text style={styles.subtitle}>流光 · 日常工具集</Text>
       <FlatList

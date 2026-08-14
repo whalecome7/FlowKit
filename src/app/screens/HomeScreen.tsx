@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { moduleRegistry } from '../module-registry';
 import { useTheme } from '../../theme';
+import type { ThemeMode } from '../../theme';
 
 type RootStackParamList = {
   Home: undefined;
@@ -17,9 +18,15 @@ type RootStackParamList = {
 
 type HomeNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
+const THEME_OPTIONS: { key: ThemeMode; label: string }[] = [
+  { key: 'light', label: '浅色' },
+  { key: 'dark', label: '深色' },
+  { key: 'system', label: '自适应' },
+];
+
 export default function HomeScreen() {
   const navigation = useNavigation<HomeNavigationProp>();
-  const { cycleMode, mode, colors } = useTheme();
+  const { mode, setMode, colors } = useTheme();
   const modules = moduleRegistry.getEnabledModules();
 
   const styles = useMemo(
@@ -74,13 +81,40 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        onPress={cycleMode}
-        style={{ padding: 8, alignSelf: 'flex-end', marginRight: 16 }}>
-        <Text style={{ color: colors.primary, fontSize: 14 }}>
-          {mode === 'light' ? '浅色' : mode === 'dark' ? '深色' : '自适应'}
-        </Text>
-      </TouchableOpacity>
+      {/* 主题切换：分段选择器 */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignSelf: 'flex-end',
+          marginRight: 16,
+          marginTop: 8,
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 18,
+          padding: 3,
+        }}>
+        {THEME_OPTIONS.map((opt) => {
+          const active = mode === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              onPress={() => setMode(opt.key)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 15,
+                backgroundColor: active ? colors.primary : 'transparent',
+              }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: active ? '#fff' : colors.textSecondary,
+                }}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
       <Text style={styles.title}>FlowKit</Text>
       <Text style={styles.subtitle}>流光 · 日常工具集</Text>
       <FlatList

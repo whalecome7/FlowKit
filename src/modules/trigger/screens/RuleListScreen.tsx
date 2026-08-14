@@ -43,30 +43,42 @@ export default function RuleListScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: 'row', gap: 12, marginRight: 8 }}>
-          <TouchableOpacity onPress={() => setSimulateVisible(true)}>
-            <Text style={{ fontSize: 14, color: colors.primary }}>模拟</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('TriggerLog')}>
-            <Text style={{ fontSize: 14, color: colors.primary }}>日志</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('TriggerRuleEdit', {})}>
-            <Text style={{ fontSize: 20, color: colors.primary }}>+</Text>
+            <Text style={{ fontSize: 20, color: colors.primary, lineHeight: 20 }}>＋</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => void exportRules(rules)}>
-            <Text style={{ fontSize: 14, color: colors.primary }}>导出</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              setImportText('');
-              setImportVisible(true);
-            }}>
-            <Text style={{ fontSize: 14, color: colors.primary }}>导入</Text>
+          <TouchableOpacity onPress={showMoreMenu}>
+            <Text style={{ fontSize: 18, color: colors.primary, lineHeight: 20 }}>⋯</Text>
           </TouchableOpacity>
         </View>
       ),
     });
-  }, [navigation, colors]);
+  }, [navigation, colors, rules]);
+
+  const showMoreMenu = () => {
+    Alert.alert('更多', undefined, [
+      {
+        text: '模拟短信',
+        onPress: () => setSimulateVisible(true),
+      },
+      {
+        text: '触发日志',
+        onPress: () => navigation.navigate('TriggerLog'),
+      },
+      {
+        text: '导出规则',
+        onPress: () => void exportRules(rules),
+      },
+      {
+        text: '导入规则',
+        onPress: () => {
+          setImportText('');
+          setImportVisible(true);
+        },
+      },
+      { text: '取消', style: 'cancel' },
+    ]);
+  };
 
   const styles = useMemo(
     () =>

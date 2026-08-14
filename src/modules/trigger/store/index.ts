@@ -68,7 +68,12 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
   },
 
   async processSms(sender, body) {
-    const { rules, logs } = get();
+    const { rules } = get();
+    // 若内存无日志（如进程刚启动），先从存储加载，避免覆盖历史
+    if (get().logs.length === 0) {
+      await get().loadLogs();
+    }
+    const { logs } = get();
     const matches = RuleEngine.compare({ sender, body }, rules);
     if (matches.length > 0) {
       const newLogs = await ActionExecutor.execute(matches, { sender, body });

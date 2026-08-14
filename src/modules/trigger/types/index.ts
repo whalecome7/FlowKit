@@ -84,8 +84,8 @@ export const ACTION_META: ActionMeta[] = [
         label: '节奏',
         placeholder: '毫秒序列，逗号分隔，如 200,100,300',
         presets: [
-          { label: '轻震 100ms', value: '100' },
-          { label: '标准 300ms', value: '300' },
+          { label: '轻震', value: '100' },
+          { label: '标准', value: '300' },
           { label: '急促连震', value: '200,80,200,80,300' },
           { label: '自定义', value: 'custom' },
         ],
@@ -96,9 +96,9 @@ export const ACTION_META: ActionMeta[] = [
         numeric: true,
         placeholder: '力度 1-255，如 180',
         presets: [
-          { label: '轻柔 60', value: '60' },
-          { label: '标准 120', value: '120' },
-          { label: '强力 200', value: '200' },
+          { label: '轻柔', value: '60' },
+          { label: '标准', value: '120' },
+          { label: '强力', value: '200' },
           { label: '自定义', value: 'custom' },
         ],
       },

@@ -10,7 +10,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 
-/** 保活前台服务：常驻通知「FlowKit 正在监听短信」 */
+/** 保活前台服务：常驻通知「FlowKit 正在工作」 */
 class KeepAliveService : Service() {
 
   override fun onCreate() {
@@ -40,8 +40,8 @@ class KeepAliveService : Service() {
     val notification: Notification =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         Notification.Builder(this, channelId)
-          .setContentTitle("FlowKit 正在监听短信")
-          .setContentText("用于及时提醒重要短信")
+          .setContentTitle("FlowKit 正在工作")
+          .setContentText("你的贴心助手，让生活更高效")
           .setSmallIcon(android.R.drawable.ic_popup_sync)
           .setContentIntent(contentIntent)
           .setOngoing(true)
@@ -49,8 +49,8 @@ class KeepAliveService : Service() {
       } else {
         @Suppress("DEPRECATION")
         Notification.Builder(this)
-          .setContentTitle("FlowKit 正在监听短信")
-          .setContentText("用于及时提醒重要短信")
+          .setContentTitle("FlowKit 正在工作")
+          .setContentText("你的贴心助手，让生活更高效")
           .setSmallIcon(android.R.drawable.ic_popup_sync)
           .setContentIntent(contentIntent)
           .setOngoing(true)

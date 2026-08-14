@@ -11,6 +11,8 @@ import {
 import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 
+const TEMPLATES = ['未按规定停放', '您的验证码是 123456', '余额不足', '到账提醒'];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -96,6 +98,16 @@ export default function SimulateSmsModal({ visible, onClose }: Props) {
             autoCapitalize="none"
           />
           <Text style={styles.label}>短信内容</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            {TEMPLATES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                onPress={() => setBody(t)}
+                style={{ backgroundColor: colors.surfaceAlt, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <TextInput
             style={[styles.input, styles.bodyInput]}
             value={body}

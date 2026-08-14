@@ -1,4 +1,5 @@
 import { RuleEngine } from '../src/modules/trigger/services/RuleEngine';
+import { ActionExecutor } from '../src/modules/trigger/services/ActionExecutor';
 import type { TriggerRule } from '../src/modules/trigger/types';
 
 function makeRule(overrides: Partial<TriggerRule> = {}): TriggerRule {
@@ -100,5 +101,27 @@ describe('RuleEngine', () => {
       [r1, r2],
     );
     expect(results.map((r) => r.rule.id)).toEqual(['a']);
+  });
+});
+
+describe('disabled action skipping', () => {
+  it('skips actions with enabled=false in executor log', async () => {
+    const logs = await ActionExecutor.execute(
+      [
+        {
+          rule: {
+            id: 'r1',
+            name: 'r',
+            enabled: true,
+            conditions: [],
+            actions: [{ id: 'a1', type: 'notify', params: { title: 't' }, enabled: false }],
+          },
+          matchedConditions: [],
+        } as any,
+      ],
+      { sender: 's', body: 'b' },
+    );
+    expect(logs[0].actions[0].success).toBe(true);
+    expect(logs[0].actions[0].error).toBe('已停用');
   });
 });

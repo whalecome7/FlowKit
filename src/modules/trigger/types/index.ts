@@ -9,6 +9,8 @@ export interface TriggerCondition {
 export interface TriggerAction {
   type: 'ringtone' | 'vibrate' | 'notify' | 'pushToWatch';
   params: Record<string, unknown>;
+  /** 动作是否启用（false 时执行阶段跳过） */
+  enabled?: boolean;
 }
 
 /** 规则 */

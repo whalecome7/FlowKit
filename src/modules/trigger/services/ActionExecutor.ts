@@ -112,6 +112,15 @@ export const ActionExecutor = {
       const actionLogs: ActionLog[] = [];
 
       for (const action of match.rule.actions) {
+        if (action.enabled === false) {
+          actionLogs.push({
+            type: action.type,
+            success: true,
+            error: '已停用',
+          });
+          continue;
+        }
+
         const handler = actionHandlers.get(action.type);
         if (handler) {
           let result: { success: boolean; error?: string };

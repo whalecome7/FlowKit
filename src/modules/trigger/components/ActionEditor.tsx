@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Switch,
+  Alert,
+  NativeModules,
 } from 'react-native';
 import { useTheme } from '../../../theme';
 import type { TriggerAction } from '../types';
@@ -106,6 +108,17 @@ export default function ActionEditor({
           paddingHorizontal: 10,
           paddingVertical: 5,
         },
+        filePickButton: {
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 8,
+          padding: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        filePickText: {
+          fontSize: 14,
+          color: colors.primary,
+        },
         input: {
           backgroundColor: colors.surfaceAlt,
           borderRadius: 8,
@@ -154,6 +167,52 @@ export default function ActionEditor({
       {meta.params.map((param) => {
         const current = action.params?.[param.key];
         const currentStr = current != null ? String(current) : '';
+        // 文件选择器参数：渲染「选择文件」按钮，替代手动输入
+        if (param.filePicker) {
+          const pickFile = async () => {
+            const module = NativeModules.FilePickerModule;
+            if (!module) {
+              Alert.alert('不可用', '当前平台不支持文件选择');
+              return;
+            }
+            try {
+              const res = await module.pickAudio();
+              onChange({
+                ...action,
+                params: { ...action.params, [param.key]: res.uri },
+              });
+            } catch (err) {
+              // 用户取消不提示；其他错误提示
+              if (String((err as { code?: string })?.code ?? err) !== 'CANCELLED') {
+                Alert.alert('选择文件失败', '请重试');
+              }
+            }
+          };
+          return (
+            <View key={param.key} style={styles.paramRow}>
+              <Text style={styles.paramLabel}>{param.label}</Text>
+              <TouchableOpacity style={styles.filePickButton} onPress={pickFile}>
+                <Text style={styles.filePickText}>
+                  {currentStr ? `已选择：${currentStr.split('/').pop() || currentStr}` : '选择本地音频文件'}
+                </Text>
+              </TouchableOpacity>
+              {currentStr ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    onChange({
+                      ...action,
+                      params: { ...action.params, [param.key]: '' },
+                    })
+                  }
+                  style={{ marginTop: 4 }}>
+                  <Text style={{ fontSize: 12, color: colors.danger }}>
+                    清除（恢复系统默认铃声）
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          );
+        }
         // 输入框显示条件：禁用手填的参数不显示；否则无预制选项、或值是「自定义」标记、或值不是任何内置预制值（自定义内容）时显示
         const showInput =
           !param.disableInput &&

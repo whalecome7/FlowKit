@@ -55,6 +55,8 @@ export interface ActionParamMeta {
   numeric?: boolean;
   /** 枚举型参数：永不显示自定义输入框 */
   disableInput?: boolean;
+  /** 文件选择器：'audio' 表示本地音频文件选择，替换手动输入 */
+  filePicker?: 'audio' | 'any';
   /** 预制选项（chips），用户可直接点选，仍保留自定义输入 */
   presets?: { label: string; value: string }[];
 }
@@ -108,7 +110,7 @@ export const ACTION_META: ActionMeta[] = [
     type: 'ringtone',
     label: '播放铃声',
     params: [
-      { key: 'url', label: '铃声地址(可选)', placeholder: '留空使用系统闹钟铃声' },
+      { key: 'url', label: '铃声文件', filePicker: 'audio' },
       { key: 'duration', label: '响铃时长(ms)', placeholder: '5000', numeric: true },
     ],
   },

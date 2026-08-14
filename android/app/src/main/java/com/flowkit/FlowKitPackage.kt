@@ -13,6 +13,7 @@ class FlowKitPackage : ReactPackage {
     RingtoneModule(reactContext),
     SmsBridgeModule(reactContext),
     VibrationModule(reactContext),
+    FilePickerModule(reactContext),
   )
 
   override fun createViewManagers(

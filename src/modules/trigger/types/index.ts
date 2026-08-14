@@ -80,18 +80,6 @@ export const ACTION_META: ActionMeta[] = [
     label: '震动',
     params: [
       {
-        key: 'mode',
-        label: '模式',
-        // 枚举型：选「自定义」时实际内容由节奏/力度参数填写，不显示输入框
-        disableInput: true,
-        presets: [
-          { label: '轻柔', value: 'gentle' },
-          { label: '标准', value: 'standard' },
-          { label: '急促', value: 'urgent' },
-          { label: '自定义', value: 'custom' },
-        ],
-      },
-      {
         key: 'pattern',
         label: '节奏',
         placeholder: '毫秒序列，逗号分隔，如 200,100,300',

@@ -17,28 +17,33 @@ export const ActionExecutor = {
 
   /** 注册内置默认处理器 */
   registerDefaults(): void {
-    // 震动：优先原生 VibrationModule（支持模式/节奏/力度），无原生时降级 RN Vibration
+    // 震动：优先原生 VibrationModule（支持节奏/力度），无原生时降级 RN Vibration
     this.registerHandler('vibrate', async (action) => {
       const params = action.params ?? {};
-      const mode = String(params.mode ?? 'standard');
-      const patternRaw = typeof params.pattern === 'string' ? params.pattern : '';
+      // 新格式：pattern 直接存节奏（含 'custom' 标记则视为未填）
+      let pattern =
+        typeof params.pattern === 'string' &&
+        params.pattern !== '' &&
+        params.pattern !== 'custom'
+          ? params.pattern
+          : '';
       const amplitude = typeof params.amplitude === 'number' ? params.amplitude : 0;
-      let pattern: string;
-      switch (mode) {
-        case 'gentle':
-          pattern = '100';
-          break;
-        case 'urgent':
-          pattern = '200,80,200,80,300';
-          break;
-        case 'custom':
-          pattern = patternRaw || '200,100,200';
-          break;
-        case 'standard':
-        default:
-          pattern = '300';
-          break;
+      // 兼容旧数据：无 pattern 时按 mode 映射（老规则的 mode 字段）
+      if (!pattern && typeof params.mode === 'string') {
+        switch (params.mode) {
+          case 'gentle':
+            pattern = '100';
+            break;
+          case 'urgent':
+            pattern = '200,80,200,80,300';
+            break;
+          case 'standard':
+          default:
+            pattern = '300';
+            break;
+        }
       }
+      if (!pattern) pattern = '300'; // 默认标准
       const nativeVibrate = NativeModules.VibrationModule;
       if (nativeVibrate) {
         nativeVibrate.vibrate(pattern, amplitude);

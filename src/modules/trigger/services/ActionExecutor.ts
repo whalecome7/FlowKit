@@ -75,14 +75,39 @@ export const ActionExecutor = {
       return { success: true };
     });
 
-    // 铃声：原生 RingtoneModule（闹钟流，静音也响），duration 后自动停止
+    // 铃声/语音播报：三分支（系统默认 / 自定义文件 / 文字播报）
     this.registerHandler('ringtone', async (action) => {
+      const params = action.params ?? {};
+      const source = String(params.source ?? 'default');
+      const speakText =
+        typeof params.speakText === 'string' ? params.speakText.trim() : '';
+
+      // 文字播报（TTS）：source=speech 且有播报文字时优先，不播铃声
+      if (source === 'speech' && speakText) {
+        const nativeTts = NativeModules.TtsModule;
+        if (!nativeTts) {
+          return { success: false, error: 'TTS 不可用' };
+        }
+        const rate = typeof params.rate === 'number' ? params.rate : 1.0;
+        const pitch = typeof params.pitch === 'number' ? params.pitch : 1.0;
+        try {
+          await nativeTts.speak(speakText, rate, pitch);
+          return { success: true };
+        } catch (err) {
+          return {
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+
+      // 铃声：原生 RingtoneModule（闹钟流，静音也响），duration 后自动停止
       const ringtoneModule = NativeModules.RingtoneModule;
       if (!ringtoneModule) {
         return { success: false, error: 'RingtoneModule 未注册（iOS 不支持）' };
       }
-      const url = typeof action.params?.url === 'string' ? action.params.url : null;
-      const raw = action.params?.duration;
+      const url = typeof params.url === 'string' && params.url ? params.url : null;
+      const raw = params.duration;
       const duration = typeof raw === 'number' && raw > 0 ? raw : 5000;
       try {
         ringtoneModule.play(url);

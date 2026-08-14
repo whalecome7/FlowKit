@@ -14,6 +14,7 @@ class FlowKitPackage : ReactPackage {
     SmsBridgeModule(reactContext),
     VibrationModule(reactContext),
     FilePickerModule(reactContext),
+    TtsModule(reactContext),
   )
 
   override fun createViewManagers(

@@ -165,6 +165,13 @@ export default function ActionEditor({
         ))}
       </View>
       {meta.params.map((param) => {
+        // 条件显示：仅当指定参数等于指定值时渲染
+        if (
+          param.showWhen &&
+          String(action.params?.[param.showWhen.key] ?? '') !== param.showWhen.value
+        ) {
+          return null;
+        }
         const current = action.params?.[param.key];
         const currentStr = current != null ? String(current) : '';
         // 文件选择器参数：渲染「选择文件」按钮，替代手动输入

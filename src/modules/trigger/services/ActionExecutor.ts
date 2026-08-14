@@ -1,5 +1,5 @@
 import { NativeModules, Vibration } from 'react-native';
-import notifee, { AndroidImportance, AuthorizationStatus } from '@notifee/react-native';
+import notifee, { AndroidImportance, AndroidVisibility, AuthorizationStatus } from '@notifee/react-native';
 import type { TriggerAction, MatchResult, ActionLog, ExecutionLog } from '../types';
 import { generateId } from '../../../shared/types';
 
@@ -69,6 +69,7 @@ export const ActionExecutor = {
     });
 
     // 推送到手表：发高重要级通知（华为 Watch 3 / Wear OS 均会镜像到手表）
+    // channel 锁住 importance 防止系统降级（小米等 ROM 会静默低优先级第三方通知）
     this.registerHandler('pushToWatch', async (action) => {
       const title = String(action.params?.title ?? 'FlowKit 手表提醒');
       const body = String(action.params?.body ?? '');
@@ -77,16 +78,26 @@ export const ActionExecutor = {
         return { success: false, error: '通知权限未授权' };
       }
       const channelId = await notifee.createChannel({
-        id: 'flowkit-watch',
-        name: '手表提醒',
+        id: 'flowkit-watch-v2',
+        name: '手表推送',
+        importance: AndroidImportance.HIGH,
+        visibility: AndroidVisibility.PUBLIC,
+        sound: 'default',
+        vibration: true,
       });
       await notifee.displayNotification({
+        // 唯一 id 避免被系统去重/聚合吞掉
+        id: `watch-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         title: `⌚ ${title}`,
         body,
         android: {
           channelId,
           importance: AndroidImportance.HIGH,
+          visibility: AndroidVisibility.PUBLIC,
+          smallIcon: 'ic_launcher',
           pressAction: { id: 'default' },
+          autoCancel: true,
+          showTimestamp: true,
         },
       });
       return { success: true };

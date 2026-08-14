@@ -1,15 +1,20 @@
-import React, { useEffect, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
+import { useSmsLogStore } from '../services/SmsLogStore';
+import type { SmsRecord } from '../types';
 
 export default function LogScreen() {
   const { logs, loadLogs } = useTriggerStore();
+  const { records, load } = useSmsLogStore();
+  const [tab, setTab] = useState<'logs' | 'sms'>('logs');
   const { colors } = useTheme();
 
   useEffect(() => {
     loadLogs();
-  }, [loadLogs]);
+    void load();
+  }, [loadLogs, load]);
 
   const formatDate = (ts: number) => {
     const d = new Date(ts);
@@ -69,38 +74,86 @@ export default function LogScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={[...logs].reverse()}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <View style={styles.logCard}>
-            <View style={styles.logHeader}>
-              <Text style={styles.logRuleName}>{item.ruleName}</Text>
-              <Text style={styles.logTime}>{formatDate(item.triggeredAt)}</Text>
-            </View>
-            <Text style={styles.logSender}>来自: {item.smsSender}</Text>
-            <Text style={styles.logBody} numberOfLines={2}>
-              {item.smsBody}
+      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        {(['logs', 'sms'] as const).map((t) => (
+          <TouchableOpacity
+            key={t}
+            onPress={() => setTab(t)}
+            style={{
+              flex: 1,
+              paddingVertical: 12,
+              alignItems: 'center',
+              borderBottomWidth: tab === t ? 2 : 0,
+              borderBottomColor: colors.primary,
+            }}>
+            <Text style={{ color: tab === t ? colors.primary : colors.textSecondary, fontWeight: '500' }}>
+              {t === 'logs' ? '触发日志' : '短信记录'}
             </Text>
-            <View style={styles.logActions}>
-              {item.actions.map((action, idx) => (
-                <Text
-                  key={idx}
-                  style={[
-                    styles.actionTag,
-                    action.success ? styles.actionSuccess : styles.actionFail,
-                  ]}>
-                  {action.type} {action.success ? '✓' : '✗'}
-                </Text>
-              ))}
+          </TouchableOpacity>
+        ))}
+      </View>
+      {tab === 'logs' && (
+        <FlatList
+          data={[...logs].reverse()}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <View style={styles.logCard}>
+              <View style={styles.logHeader}>
+                <Text style={styles.logRuleName}>{item.ruleName}</Text>
+                <Text style={styles.logTime}>{formatDate(item.triggeredAt)}</Text>
+              </View>
+              <Text style={styles.logSender}>来自: {item.smsSender}</Text>
+              <Text style={styles.logBody} numberOfLines={2}>
+                {item.smsBody}
+              </Text>
+              <View style={styles.logActions}>
+                {item.actions.map((action, idx) => (
+                  <Text
+                    key={idx}
+                    style={[
+                      styles.actionTag,
+                      action.success ? styles.actionSuccess : styles.actionFail,
+                    ]}>
+                    {action.type} {action.success ? '✓' : '✗'}
+                  </Text>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>暂无触发记录</Text>
-        }
-      />
+          )}
+          ListEmptyComponent={
+            <Text style={styles.empty}>暂无触发记录</Text>
+          }
+        />
+      )}
+      {tab === 'sms' && (
+        <FlatList
+          data={[...records].reverse()}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }: { item: SmsRecord }) => (
+            <View style={styles.logCard}>
+              <View style={styles.logHeader}>
+                <Text style={styles.logRuleName}>{item.sender || '(未知发件人)'}</Text>
+                <Text style={styles.logTime}>{formatDate(item.receivedAt)}</Text>
+              </View>
+              <Text style={styles.logBody} numberOfLines={2}>{item.body}</Text>
+              <View style={styles.logActions}>
+                {item.matchedRuleNames.length > 0 ? (
+                  <Text style={[styles.actionTag, styles.actionSuccess]}>
+                    命中: {item.matchedRuleNames.join(', ')}
+                  </Text>
+                ) : (
+                  <Text style={[styles.actionTag, { backgroundColor: colors.surfaceAlt, color: colors.textSecondary }]}>
+                    未命中
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={<Text style={styles.empty}>暂无短信记录</Text>}
+        />
+      )}
     </View>
   );
 }

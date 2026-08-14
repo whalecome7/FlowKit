@@ -87,3 +87,4 @@ yarn-error.log
 # WorkBuddy local data
 .workbuddy/
 android/app/flowkit-release.keystore
+release/

@@ -3,6 +3,7 @@ import type { TriggerRule, ExecutionLog } from '../types';
 import { RuleStorage } from '../services/RuleStorage';
 import { RuleEngine } from '../services/RuleEngine';
 import { ActionExecutor } from '../services/ActionExecutor';
+import { useSmsLogStore } from '../services/SmsLogStore';
 import { generateId } from '../../../shared/types';
 
 interface TriggerState {
@@ -75,6 +76,14 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     }
     const { logs } = get();
     const matches = RuleEngine.compare({ sender, body }, rules);
+    const matchedRuleNames = matches.map((m) => m.rule.name);
+    await useSmsLogStore.getState().add({
+      id: generateId(),
+      sender,
+      body,
+      receivedAt: Date.now(),
+      matchedRuleNames,
+    });
     if (matches.length > 0) {
       const newLogs = await ActionExecutor.execute(matches, { sender, body });
       const updatedLogs = [...logs, ...newLogs];

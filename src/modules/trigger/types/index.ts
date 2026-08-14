@@ -102,3 +102,13 @@ export const ACTION_META: ActionMeta[] = [
 export function getActionMeta(type: string): ActionMeta | undefined {
   return ACTION_META.find((m) => m.type === type);
 }
+
+/** 监听到的短信记录（无论是否命中规则） */
+export interface SmsRecord {
+  id: string;
+  sender: string;
+  body: string;
+  receivedAt: number;
+  /** 命中的规则名列表（未命中为空数组） */
+  matchedRuleNames: string[];
+}

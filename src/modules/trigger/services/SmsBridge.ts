@@ -34,6 +34,9 @@ export function initSmsBridge(): void {
   // 确保保活服务在跑
   SmsBridge.startService?.();
 
+  // 尝试注册短信数据库监听（READ_SMS 已授权时；未授权则等授权后 refreshWatcher）
+  SmsBridge.refreshWatcher?.();
+
   initialized = true;
 }
 

@@ -2,9 +2,13 @@ package com.flowkit
 
 import android.content.Context
 import android.content.Intent
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactApplicationContext
@@ -75,6 +79,38 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       )
   }
 
+  /** 短信数据库监听：小米 ROM 不分发 SMS_RECEIVED 广播，改为监听短信库变化 */
+  private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+    override fun onChange(selfChange: Boolean) {
+      checkNewSms(reactApplicationContext)
+    }
+  }
+
+  /** 注册短信数据库监听（READ_SMS 已授权时） */
+  fun registerSmsWatcher() {
+    try {
+      val granted = reactApplicationContext
+        .checkSelfPermission(android.Manifest.permission.READ_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+      if (!granted) {
+        Log.e("SmsBridge", "READ_SMS 未授权，短信监听不可用")
+        return
+      }
+      reactApplicationContext.contentResolver
+        .registerContentObserver(Uri.parse("content://sms"), true, smsObserver)
+      Log.d("SmsBridge", "短信数据库监听已注册")
+      // 启动时同步一次当前最新短信 id，避免误触发历史短信
+      checkNewSms(reactApplicationContext)
+    } catch (e: Exception) {
+      Log.e("SmsBridge", "注册短信监听失败: ${e.message}")
+    }
+  }
+
+  /** JS 授权后调用：重新注册短信监听 */
+  @ReactMethod
+  fun refreshWatcher() {
+    registerSmsWatcher()
+  }
+
   companion object {
     const val NAME = "SmsBridge"
     const val EVENT_NAME = "onSmsReceived"
@@ -83,6 +119,37 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     private var pendingSms: Pair<String, String>? = null
 
     private var instance: SmsBridgeModule? = null
+
+    private var lastSmsId: Long = -1
+
+    /** 检查短信库最新短信（供 ContentObserver 与保活服务轮询共用，跨线程安全） */
+    @Synchronized
+    fun checkNewSms(context: Context) {
+      try {
+        val resolver = context.contentResolver
+        val cursor = resolver.query(
+          Uri.parse("content://sms/inbox"),
+          arrayOf("_id", "address", "body"),
+          null,
+          null,
+          "date DESC"
+        )
+        cursor?.use { c ->
+          if (c.moveToFirst()) {
+            val id = c.getLong(0)
+            if (id != lastSmsId) {
+              lastSmsId = id
+              val sender = c.getString(1) ?: ""
+              val body = c.getString(2) ?: ""
+              Log.d("SmsBridge", "DB 新短信 #$id from $sender: $body")
+              emitSms(sender, body)
+            }
+          }
+        }
+      } catch (e: Exception) {
+        Log.e("SmsBridge", "查询短信失败: ${e.message}")
+      }
+    }
 
     /** 由 SmsReceiver 调用：App 在前台直接发事件，否则缓存待 JS 补发 */
     fun emitSms(sender: String, body: String) {
@@ -93,5 +160,6 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
 
   init {
     instance = this
+    registerSmsWatcher()
   }
 }

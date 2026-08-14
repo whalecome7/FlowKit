@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform, NativeModules } from 'react-native';
 import notifee, { AuthorizationStatus } from '@notifee/react-native';
 import { create } from 'zustand';
 import { isBatteryExempt, requestBatteryExempt } from './SmsBridge';
@@ -28,9 +28,13 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
   async refresh() {
     let sms = false;
     if (Platform.OS === 'android') {
-      sms = await PermissionsAndroid.check(
+      const recv = await PermissionsAndroid.check(
         PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
       );
+      const read = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.READ_SMS,
+      );
+      sms = recv && read;
     }
     const settings = await notifee.getNotificationSettings();
     const notify = settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
@@ -40,11 +44,20 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
 
   async requestSms() {
     if (Platform.OS !== 'android') return false;
-    const granted = await PermissionsAndroid.request(
+    const results = await PermissionsAndroid.requestMultiple([
       PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
-    );
-    const smsGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
+      PermissionsAndroid.PERMISSIONS.READ_SMS,
+    ]);
+    const smsGranted =
+      results[PermissionsAndroid.PERMISSIONS.RECEIVE_SMS] ===
+        PermissionsAndroid.RESULTS.GRANTED &&
+      results[PermissionsAndroid.PERMISSIONS.READ_SMS] ===
+        PermissionsAndroid.RESULTS.GRANTED;
     set({ smsGranted, checked: true });
+    // 授权成功后注册短信数据库监听（小米 ROM 需要 READ_SMS + ContentObserver）
+    if (smsGranted) {
+      NativeModules.SmsBridge?.refreshWatcher?.();
+    }
     return smsGranted;
   },
 

@@ -109,14 +109,21 @@ export default function LogScreen() {
               </Text>
               <View style={styles.logActions}>
                 {item.actions.map((action, idx) => (
-                  <Text
-                    key={idx}
-                    style={[
-                      styles.actionTag,
-                      action.success ? styles.actionSuccess : styles.actionFail,
-                    ]}>
-                    {action.type} {action.success ? '✓' : '✗'}
-                  </Text>
+                  <View key={idx} style={{ marginBottom: 2 }}>
+                    <Text
+                      style={[
+                        styles.actionTag,
+                        action.success ? styles.actionSuccess : styles.actionFail,
+                      ]}>
+                      {action.type} {action.success ? '✓' : '✗'}
+                    </Text>
+                    {!action.success && action.error ? (
+                      <Text
+                        style={{ fontSize: 11, color: colors.danger, marginTop: 2 }}>
+                        {action.error}
+                      </Text>
+                    ) : null}
+                  </View>
                 ))}
               </View>
             </View>

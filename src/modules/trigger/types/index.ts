@@ -137,6 +137,7 @@ export const ACTION_META: ActionMeta[] = [
       {
         key: 'rate',
         label: '语速',
+        numeric: true,
         disableInput: true,
         showWhen: { key: 'source', value: 'speech' },
         presets: [
@@ -148,6 +149,7 @@ export const ACTION_META: ActionMeta[] = [
       {
         key: 'pitch',
         label: '音调',
+        numeric: true,
         disableInput: true,
         showWhen: { key: 'source', value: 'speech' },
         presets: [

@@ -33,7 +33,14 @@ class VibrationModule(private val reactContext: ReactApplicationContext) :
           VibrationEffect.createOneShot(500, amp)
         } else {
           val waveform = if (times.size % 2 == 0) times else times + longArrayOf(1000)
-          VibrationEffect.createWaveform(waveform, amp)
+          if (amp == VibrationEffect.DEFAULT_AMPLITUDE) {
+            // 未指定力度：timings + repeat=-1（不重复）
+            VibrationEffect.createWaveform(waveform, -1)
+          } else {
+            // 指定力度：timings + amplitudes 数组 + repeat=-1
+            val amplitudes = IntArray(waveform.size) { amp }
+            VibrationEffect.createWaveform(waveform, amplitudes, -1)
+          }
         }
       vibrator.vibrate(effect)
     } else {

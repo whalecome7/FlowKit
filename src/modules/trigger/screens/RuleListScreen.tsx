@@ -200,7 +200,12 @@ export default function RuleListScreen() {
             padding: 24,
           }}>
           <View
-            style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 20 }}>
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 16,
+              padding: 20,
+              maxHeight: '85%',
+            }}>
             <Text
               style={{
                 fontSize: 16,
@@ -222,6 +227,7 @@ export default function RuleListScreen() {
                 borderRadius: 8,
                 padding: 12,
                 minHeight: 140,
+                maxHeight: 280,
                 textAlignVertical: 'top',
               }}
             />

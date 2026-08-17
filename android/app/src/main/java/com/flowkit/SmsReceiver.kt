@@ -11,26 +11,32 @@ import android.util.Log
 class SmsReceiver : BroadcastReceiver() {
 
   override fun onReceive(context: Context, intent: Intent) {
+    // 诊断：第一行日志，确认 onReceive 是否被调用
+    Log.d("SmsReceiver", "onReceive called action=${intent.action}")
     if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
-    val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
-    if (messages.isEmpty()) return
+    try {
+      val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
+      if (messages.isEmpty()) return
 
-    val body = StringBuilder()
-    for (m in messages) body.append(m.messageBody ?: "")
-    val sender = messages[0].originatingAddress ?: ""
+      val body = StringBuilder()
+      for (m in messages) body.append(m.messageBody ?: "")
+      val sender = messages[0].originatingAddress ?: ""
 
-    Log.d("SmsReceiver", "SMS from $sender: $body")
+      Log.d("SmsReceiver", "SMS from $sender: $body")
 
-    // 确保保活服务在跑
-    val serviceIntent = Intent(context, KeepAliveService::class.java)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      context.startForegroundService(serviceIntent)
-    } else {
-      context.startService(serviceIntent)
+      // 确保保活服务在跑
+      val serviceIntent = Intent(context, KeepAliveService::class.java)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(serviceIntent)
+      } else {
+        context.startService(serviceIntent)
+      }
+
+      // 直接转发给 JS（与 8/14 17:50 验证触发成功的版本一致）
+      SmsBridgeModule.emitSms(sender, body.toString())
+    } catch (e: Throwable) {
+      Log.e("SmsReceiver", "onReceive 异常: ${e.message}", e)
     }
-
-    // 转发给 JS（App 被杀时先缓存，JS 就绪后补发）
-    SmsBridgeModule.emitSms(sender, body.toString())
   }
 }

@@ -8,19 +8,41 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 
-/** 保活前台服务：常驻通知「FlowKit 正在工作」 */
+/** 保活前台服务：常驻通知 + 短信库低频轮询兜底（小米锁屏屏蔽广播时的替代路径） */
 class KeepAliveService : Service() {
+
+  private val handler = Handler(Looper.getMainLooper())
+  private val pollIntervalMs = 10_000L
+
+  /** 每 10 秒检查一次短信库（id 去重，广播正常时不会重复触发） */
+  private val pollTask = object : Runnable {
+    override fun run() {
+      try {
+        SmsBridgeModule.checkNewSms(this@KeepAliveService)
+      } catch (_: Exception) {
+      }
+      handler.postDelayed(this, pollIntervalMs)
+    }
+  }
 
   override fun onCreate() {
     super.onCreate()
     startForegroundCompat()
+    handler.post(pollTask)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     startForegroundCompat()
     return START_STICKY // 被系统回收后尝试重建
+  }
+
+  override fun onDestroy() {
+    handler.removeCallbacks(pollTask)
+    super.onDestroy()
   }
 
   override fun onBind(intent: Intent?): IBinder? = null

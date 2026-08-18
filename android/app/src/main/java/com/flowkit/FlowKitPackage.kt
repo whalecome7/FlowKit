@@ -11,6 +11,7 @@ class FlowKitPackage : ReactPackage {
     reactContext: ReactApplicationContext
   ): List<NativeModule> = listOf(
     ContactsModule(reactContext),
+    QRCodeModule(reactContext),
     RingtoneModule(reactContext),
     SmsBridgeModule(reactContext),
     VibrationModule(reactContext),

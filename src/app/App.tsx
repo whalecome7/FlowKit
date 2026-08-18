@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
 import { registerTriggerModule } from '../modules/trigger';
 import { registerReactionModule } from '../modules/reaction';
+import ReactionHome from '../modules/reaction/screens/ReactionHome';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -58,6 +59,11 @@ function AppNavigator() {
           name="TriggerStatistics"
           component={StatisticsScreen}
           options={{ title: '触发统计' }}
+        />
+        <Stack.Screen
+          name="ReactionHome"
+          component={ReactionHome}
+          options={{ title: '反应力测试' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

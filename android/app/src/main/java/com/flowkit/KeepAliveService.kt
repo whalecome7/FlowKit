@@ -26,6 +26,11 @@ class KeepAliveService : Service() {
     override fun run() {
       try {
         SmsBridgeModule.checkNewSms(this@KeepAliveService)
+        // 心跳：写入诊断时间戳（自诊断页读取）
+        getSharedPreferences("flowkit_diag", Context.MODE_PRIVATE)
+          .edit()
+          .putLong("heartbeat_ts", System.currentTimeMillis())
+          .apply()
       } catch (_: Exception) {
       }
       handler.postDelayed(this, pollIntervalMs)

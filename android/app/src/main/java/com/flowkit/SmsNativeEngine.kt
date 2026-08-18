@@ -115,6 +115,9 @@ object SmsNativeEngine {
     }
   }
 
+  /** 当前规则快照条数（自诊断页展示） */
+  fun rulesCount(): Int = rules.size
+
   private data class NativeCondition(
     val field: String,
     val matchType: String,

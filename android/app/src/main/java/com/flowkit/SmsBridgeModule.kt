@@ -1,7 +1,9 @@
 package com.flowkit
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
@@ -134,6 +136,36 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
   @ReactMethod
   fun refreshWatcher() {
     registerSmsWatcher()
+  }
+
+  /** 自诊断数据：心跳时间戳 / 规则快照条数 / 权限状态 */
+  @ReactMethod
+  fun getDiagnostics(callback: Callback) {
+    val prefs = reactApplicationContext.getSharedPreferences("flowkit_diag", Context.MODE_PRIVATE)
+    val heartbeatTs = prefs.getLong("heartbeat_ts", -1L)
+    val map = Arguments.createMap()
+    map.putDouble("heartbeatTs", heartbeatTs.toDouble())
+    map.putInt("rulesSynced", SmsNativeEngine.rulesCount())
+    val perms = Arguments.createMap()
+    perms.putBoolean(
+      "receiveSms",
+      reactApplicationContext.checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+    )
+    perms.putBoolean(
+      "readSms",
+      reactApplicationContext.checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+    )
+    perms.putBoolean(
+      "notifications",
+      reactApplicationContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    )
+    perms.putBoolean(
+      "batteryExempt",
+      (reactApplicationContext.getSystemService(Context.POWER_SERVICE) as? PowerManager)
+        ?.isIgnoringBatteryOptimizations(reactApplicationContext.packageName) == true
+    )
+    map.putMap("perms", perms)
+    callback.invoke(map)
   }
 
   /** JS 同步规则快照（锁屏时原生闭环匹配用） */

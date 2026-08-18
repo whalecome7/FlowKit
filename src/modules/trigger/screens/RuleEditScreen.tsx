@@ -19,6 +19,7 @@ import { ACTION_META, getActionMeta } from '../types';
 import ConditionEditor from '../components/ConditionEditor';
 import ActionEditor from '../components/ActionEditor';
 import PromptInputModal from '../components/PromptInputModal';
+import { ContactsPickerModal } from '../components/ContactsPickerModal';
 
 type RouteParams = {
   TriggerRuleEdit: { ruleId?: string };
@@ -79,6 +80,10 @@ export default function RuleEditScreen() {
     'whitelist' | 'blacklist' | null
   >(null);
   const [manualInput, setManualInput] = useState('');
+  // 通讯录多选弹窗状态
+  const [contactTarget, setContactTarget] = useState<
+    'whitelist' | 'blacklist' | null
+  >(null);
   // 时间输入弹窗状态
   const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
   const [timeInput, setTimeInput] = useState('');
@@ -220,6 +225,24 @@ export default function RuleEditScreen() {
     setManualTarget(null);
   };
 
+  const addFromContacts = (nums: string[]) => {
+    if (nums.length === 0) return;
+    if (contactTarget === 'whitelist') {
+      setSenderWhitelist((prev) => {
+        const merged = [...prev, ...nums];
+        return merged.filter((v, i) => merged.indexOf(v) === i);
+      });
+      setSenderBlacklist((prev) => prev.filter((v) => !nums.includes(v))); // 跨名单去重
+    } else if (contactTarget === 'blacklist') {
+      setSenderBlacklist((prev) => {
+        const merged = [...prev, ...nums];
+        return merged.filter((v, i) => merged.indexOf(v) === i);
+      });
+      setSenderWhitelist((prev) => prev.filter((v) => !nums.includes(v))); // 跨名单去重
+    }
+    setContactTarget(null);
+  };
+
   const openTimeInput = (target: 'start' | 'end') => {
     setTimeTarget(target);
     setTimeInput(target === 'start' ? timeWindowStart : timeWindowEnd);
@@ -277,9 +300,7 @@ export default function RuleEditScreen() {
       <View style={styles.btnRow}>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() =>
-            Alert.alert('提示', '通讯录选择将在后续版本开放')
-          }>
+          onPress={() => setContactTarget(target)}>
           <Text style={styles.addBtnText}>👤 从通讯录选择</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -702,6 +723,12 @@ export default function RuleEditScreen() {
       onChangeText={setManualInput}
       onConfirm={addManualSender}
       onClose={() => setManualTarget(null)}
+    />
+
+    <ContactsPickerModal
+      visible={contactTarget !== null}
+      onClose={() => setContactTarget(null)}
+      onConfirm={addFromContacts}
     />
 
     <PromptInputModal

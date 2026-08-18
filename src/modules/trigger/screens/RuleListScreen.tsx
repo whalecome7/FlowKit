@@ -72,6 +72,13 @@ export default function RuleListScreen() {
       },
     },
     {
+      label: '自诊断',
+      onPress: () => {
+        setMoreVisible(false);
+        navigation.navigate('TriggerDiagnostics');
+      },
+    },
+    {
       label: '导出规则',
       onPress: () => {
         setMoreVisible(false);

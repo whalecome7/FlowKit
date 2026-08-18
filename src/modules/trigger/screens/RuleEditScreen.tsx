@@ -16,13 +16,14 @@ import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 import type { TriggerCondition, TriggerAction } from '../types';
 import { ACTION_META, getActionMeta } from '../types';
+import { RULE_TEMPLATES } from '../services/RuleTemplates';
 import ConditionEditor from '../components/ConditionEditor';
 import ActionEditor from '../components/ActionEditor';
 import PromptInputModal from '../components/PromptInputModal';
 import { ContactsPickerModal } from '../components/ContactsPickerModal';
 
 type RouteParams = {
-  TriggerRuleEdit: { ruleId?: string };
+  TriggerRuleEdit: { ruleId?: string; templateId?: string };
 };
 
 const FIELD_LABELS: Record<TriggerCondition['field'], string> = {
@@ -46,12 +47,24 @@ export default function RuleEditScreen() {
   const existingRule = ruleId ? rules.find((r) => r.id === ruleId) : undefined;
   const isEditing = !!existingRule;
 
-  const [name, setName] = useState(existingRule?.name ?? '');
+  const template = route.params?.templateId
+    ? RULE_TEMPLATES.find((t) => t.id === route.params?.templateId)
+    : undefined;
+
+  const [name, setName] = useState(
+    existingRule?.name ??
+      (template && !existingRule ? template.name : undefined) ??
+      '',
+  );
   const [conditions, setConditions] = useState<TriggerCondition[]>(
-    existingRule?.conditions ?? [],
+    existingRule?.conditions ??
+      (template && !existingRule ? template.conditions : []) ??
+      [],
   );
   const [actions, setActions] = useState<TriggerAction[]>(
-    existingRule?.actions ?? [],
+    existingRule?.actions ??
+      (template && !existingRule ? template.actions : []) ??
+      [],
   );
   const [editing, setEditing] = useState<{
     kind: 'condition' | 'action';
@@ -192,6 +205,9 @@ export default function RuleEditScreen() {
             end: timeWindowEnd,
           },
         });
+      }
+      if (template?.needsAttention && !isEditing) {
+        Alert.alert('提示', template.needsAttention);
       }
       navigation.goBack();
     } catch {

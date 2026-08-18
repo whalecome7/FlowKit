@@ -9,12 +9,14 @@ import {
   Alert,
   Modal,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
 import { exportRules, parseRules } from '../services/RuleExport';
+import { RULE_TEMPLATES } from '../services/RuleTemplates';
 import { usePermissionStore } from '../services/Permissions';
 import SimulateSmsModal from '../components/SimulateSmsModal';
 
@@ -24,6 +26,7 @@ export default function RuleListScreen() {
   const { rules, loadRules, toggleRule, deleteRule, duplicateRule, addRule } =
     useTriggerStore();
   const [simulateVisible, setSimulateVisible] = useState(false);
+  const [templateVisible, setTemplateVisible] = useState(false);
   const [importVisible, setImportVisible] = useState(false);
   const [importText, setImportText] = useState('');
   const [moreVisible, setMoreVisible] = useState(false);
@@ -45,7 +48,7 @@ export default function RuleListScreen() {
       headerRight: () => (
         <View style={{ flexDirection: 'row', gap: 12, marginRight: 8 }}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('TriggerRuleEdit', {})}>
+            onPress={() => setTemplateVisible(true)}>
             <Text style={{ fontSize: 20, color: colors.primary, lineHeight: 20 }}>＋</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setMoreVisible(true)}>
@@ -201,6 +204,80 @@ export default function RuleListScreen() {
         visible={simulateVisible}
         onClose={() => setSimulateVisible(false)}
       />
+      <Modal
+        visible={templateVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTemplateVisible(false)}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            padding: 24,
+          }}>
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 16,
+              padding: 20,
+              maxHeight: '85%',
+            }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '600',
+                marginBottom: 12,
+                color: colors.text,
+              }}>
+              新建规则
+            </Text>
+            <ScrollView>
+              <TouchableOpacity
+                onPress={() => {
+                  setTemplateVisible(false);
+                  navigation.navigate('TriggerRuleEdit', {});
+                }}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: colors.surfaceAlt,
+                  marginBottom: 8,
+                }}>
+                <Text style={{ color: colors.text, fontWeight: '500' }}>
+                  ⬜ 空白规则
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                  从零开始配置
+                </Text>
+              </TouchableOpacity>
+              {RULE_TEMPLATES.map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => {
+                    setTemplateVisible(false);
+                    navigation.navigate('TriggerRuleEdit', {
+                      templateId: t.id,
+                    });
+                  }}
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    backgroundColor: colors.surfaceAlt,
+                    marginBottom: 8,
+                  }}>
+                  <Text style={{ color: colors.text, fontWeight: '500' }}>
+                    {t.icon} {t.name}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                    {t.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={importVisible}
         transparent

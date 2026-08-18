@@ -5,6 +5,7 @@ import HomeScreen from './screens/HomeScreen';
 import { registerTriggerModule } from '../modules/trigger';
 import { registerReactionModule } from '../modules/reaction';
 import ReactionHome from '../modules/reaction/screens/ReactionHome';
+import ReactionGame from '../modules/reaction/screens/ReactionGame';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -63,6 +64,11 @@ function AppNavigator() {
         <Stack.Screen
           name="ReactionHome"
           component={ReactionHome}
+          options={{ title: '反应力测试' }}
+        />
+        <Stack.Screen
+          name="ReactionGame"
+          component={ReactionGame}
           options={{ title: '反应力测试' }}
         />
       </Stack.Navigator>

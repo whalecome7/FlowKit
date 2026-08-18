@@ -69,6 +69,10 @@ export function ContactsPickerModal({
     setSelected((s) => (s.includes(n) ? s.filter((x) => x !== n) : [...s, n]));
   };
 
+  /** 联系人的号码是否任一已选中（多号码联系人只要选了一个即高亮） */
+  const isContactSelected = (phones: string[]) =>
+    phones.some((p) => selected.includes(norm(p)));
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -85,14 +89,24 @@ export function ContactsPickerModal({
             data={filtered}
             keyExtractor={(item, i) => `${item.name}-${i}`}
             style={{ maxHeight: 380 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => item.phones.forEach((p) => toggle(p))}
-                style={styles.item}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemPhones}>{item.phones.join(' / ')}</Text>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const selectedFlag = isContactSelected(item.phones);
+              return (
+                <TouchableOpacity
+                  onPress={() => item.phones.forEach((p) => toggle(p))}
+                  style={[styles.item, selectedFlag && styles.itemSelected]}>
+                  <View style={styles.itemTextWrap}>
+                    <Text style={[styles.itemName, selectedFlag && styles.itemNameSelected]}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.itemPhones}>{item.phones.join(' / ')}</Text>
+                  </View>
+                  <View style={[styles.check, selectedFlag && styles.checkOn]}>
+                    {selectedFlag && <Text style={styles.checkMark}>✓</Text>}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
           />
           <View style={styles.btnRow}>
             <TouchableOpacity onPress={onClose}>
@@ -118,9 +132,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
   search: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 10 },
   hint: { color: '#888', fontSize: 12, marginBottom: 8 },
-  item: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
+  item: { paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee', borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+  itemSelected: { backgroundColor: 'rgba(79,158,255,0.12)' },
+  itemTextWrap: { flex: 1 },
   itemName: { fontWeight: '500', fontSize: 14 },
+  itemNameSelected: { color: '#2f7fe0', fontWeight: '600' },
   itemPhones: { color: '#888', fontSize: 12, marginTop: 2 },
+  check: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#bbb', marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
+  checkOn: { backgroundColor: '#4f9eff', borderColor: '#4f9eff' },
+  checkMark: { color: '#fff', fontSize: 13, fontWeight: '700' },
   btnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 12 },
   cancel: { padding: 8, color: '#666', fontSize: 14 },
   confirm: { padding: 8, color: '#4f9eff', fontWeight: '600', fontSize: 14 },

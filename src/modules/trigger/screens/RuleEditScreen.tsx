@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Switch,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -57,6 +58,29 @@ export default function RuleEditScreen() {
   const [draftCondition, setDraftCondition] =
     useState<TriggerCondition | null>(null);
   const [draftAction, setDraftAction] = useState<TriggerAction | null>(null);
+  const [senderWhitelist, setSenderWhitelist] = useState<string[]>(
+    existingRule?.senderWhitelist ?? [],
+  );
+  const [senderBlacklist, setSenderBlacklist] = useState<string[]>(
+    existingRule?.senderBlacklist ?? [],
+  );
+  const [timeWindowEnabled, setTimeWindowEnabled] = useState(
+    existingRule?.timeWindow?.enabled ?? true,
+  );
+  const [timeWindowStart, setTimeWindowStart] = useState(
+    existingRule?.timeWindow?.start ?? '08:00',
+  );
+  const [timeWindowEnd, setTimeWindowEnd] = useState(
+    existingRule?.timeWindow?.end ?? '22:00',
+  );
+  // 手动输入号码弹窗状态
+  const [manualTarget, setManualTarget] = useState<
+    'whitelist' | 'blacklist' | null
+  >(null);
+  const [manualInput, setManualInput] = useState('');
+  // 时间输入弹窗状态
+  const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
+  const [timeInput, setTimeInput] = useState('');
 
   const openConditionModal = (index: number) => {
     setDraftCondition({ ...conditions[index] });
@@ -140,6 +164,13 @@ export default function RuleEditScreen() {
           name: name.trim(),
           conditions,
           actions,
+          senderWhitelist,
+          senderBlacklist,
+          timeWindow: {
+            enabled: timeWindowEnabled,
+            start: timeWindowStart,
+            end: timeWindowEnd,
+          },
         });
       } else {
         await addRule({
@@ -147,6 +178,13 @@ export default function RuleEditScreen() {
           enabled: true,
           conditions,
           actions,
+          senderWhitelist,
+          senderBlacklist,
+          timeWindow: {
+            enabled: timeWindowEnabled,
+            start: timeWindowStart,
+            end: timeWindowEnd,
+          },
         });
       }
       navigation.goBack();
@@ -154,6 +192,93 @@ export default function RuleEditScreen() {
       Alert.alert('错误', '保存失败');
     }
   };
+
+  const addManualSender = () => {
+    const value = manualInput.trim();
+    if (!value) {
+      Alert.alert('提示', '请输入号码');
+      return;
+    }
+    if (manualTarget === 'whitelist') {
+      setSenderWhitelist((prev) =>
+        prev.includes(value) ? prev : [...prev, value],
+      );
+    } else if (manualTarget === 'blacklist') {
+      setSenderBlacklist((prev) =>
+        prev.includes(value) ? prev : [...prev, value],
+      );
+    } else {
+      return;
+    }
+    setManualTarget(null);
+    setManualInput('');
+  };
+
+  const openTimeInput = (target: 'start' | 'end') => {
+    setTimeTarget(target);
+    setTimeInput(target === 'start' ? timeWindowStart : timeWindowEnd);
+  };
+
+  const confirmTimeInput = () => {
+    if (!timeTarget) return;
+    const value = timeInput.trim();
+    if (!/^\d{1,2}:\d{2}$/.test(value)) {
+      Alert.alert('提示', '请输入合法时间（HH:mm）');
+      return;
+    }
+    if (timeTarget === 'start') {
+      setTimeWindowStart(value);
+    } else {
+      setTimeWindowEnd(value);
+    }
+    setTimeTarget(null);
+    setTimeInput('');
+  };
+
+  const renderSenderList = (
+    title: string,
+    list: string[],
+    setList: (v: string[]) => void,
+    target: 'whitelist' | 'blacklist',
+  ) => (
+    <View style={styles.filterCard}>
+      <Text style={styles.filterTitle}>{title}</Text>
+      {list.length === 0 && (
+        <Text style={styles.filterHint}>尚未添加号码</Text>
+      )}
+      <View style={styles.chipWrap}>
+        {list.map((item, idx) => (
+          <View key={idx} style={styles.chip}>
+            <Text style={styles.chipText} numberOfLines={1}>
+              {item}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setList(list.filter((_, i) => i !== idx))}
+              hitSlop={8}>
+              <Text style={styles.chipRemove}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+      <View style={styles.btnRow}>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() =>
+            Alert.alert('提示', '通讯录选择将在后续版本开放')
+          }>
+          <Text style={styles.addBtnText}>👤 从通讯录选择</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => {
+            setManualTarget(target);
+            setManualInput('');
+          }}>
+          <Text style={styles.addBtnText}>⌨ 手动输入</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const styles = useMemo(
     () =>
@@ -256,6 +381,96 @@ export default function RuleEditScreen() {
           borderWidth: 1,
           borderColor: colors.border,
         },
+        filterCard: {
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 14,
+          marginBottom: 10,
+        },
+        filterTitle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        filterHint: {
+          fontSize: 12,
+          color: colors.textMuted,
+          marginBottom: 10,
+        },
+        chipWrap: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+        },
+        chip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 16,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          marginRight: 8,
+          marginBottom: 8,
+          maxWidth: '80%',
+        },
+        chipText: {
+          flexShrink: 1,
+          fontSize: 13,
+          color: colors.text,
+          marginRight: 6,
+        },
+        chipRemove: {
+          fontSize: 14,
+          color: colors.textMuted,
+          padding: 2,
+        },
+        btnRow: {
+          flexDirection: 'row',
+          marginTop: 4,
+        },
+        addBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 8,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          marginRight: 8,
+        },
+        addBtnText: {
+          fontSize: 12,
+          fontWeight: '500',
+          color: colors.primary,
+        },
+        timeRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 10,
+        },
+        timeBox: {
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          marginRight: 8,
+        },
+        timeBoxText: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+          marginRight: 8,
+        },
+        modalInput: {
+          backgroundColor: colors.surfaceAlt,
+          borderRadius: 10,
+          padding: 12,
+          fontSize: 16,
+          color: colors.text,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginBottom: 12,
+        },
         empty: {
           fontSize: 13,
           color: colors.textMuted,
@@ -312,6 +527,54 @@ export default function RuleEditScreen() {
           )}
         </TouchableOpacity>
       ))}
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>发送人过滤</Text>
+      </View>
+      <Text style={styles.filterHint}>
+        白名单优先，黑名单排除；号码自动归一化匹配
+      </Text>
+      {renderSenderList(
+        '仅限以下发送人',
+        senderWhitelist,
+        setSenderWhitelist,
+        'whitelist',
+      )}
+      {renderSenderList(
+        '排除以下发送人',
+        senderBlacklist,
+        setSenderBlacklist,
+        'blacklist',
+      )}
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>生效时间窗口</Text>
+        <Switch
+          value={timeWindowEnabled}
+          onValueChange={setTimeWindowEnabled}
+          trackColor={{ true: colors.primary, false: colors.border }}
+        />
+      </View>
+      {timeWindowEnabled && (
+        <>
+          <View style={styles.timeRow}>
+            <TouchableOpacity
+              style={styles.timeBox}
+              onPress={() => openTimeInput('start')}>
+              <Text style={styles.timeBoxText}>{timeWindowStart}</Text>
+            </TouchableOpacity>
+            <Text style={styles.timeBoxText}>→</Text>
+            <TouchableOpacity
+              style={styles.timeBox}
+              onPress={() => openTimeInput('end')}>
+              <Text style={styles.timeBoxText}>{timeWindowEnd}</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.filterHint}>
+            窗口外收到的短信完全静默 · 支持跨天（如 22:00 → 08:00）
+          </Text>
+        </>
+      )}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>触发动作</Text>
@@ -421,6 +684,72 @@ export default function RuleEditScreen() {
           )}
           <TouchableOpacity style={styles.doneButton} onPress={confirmAction}>
             <Text style={styles.doneButtonText}>完成</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+
+    <Modal
+      visible={manualTarget !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setManualTarget(null)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {manualTarget === 'whitelist'
+                ? '添加白名单号码'
+                : '添加黑名单号码'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setManualTarget(null)}
+              hitSlop={8}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.modalInput}
+            value={manualInput}
+            onChangeText={setManualInput}
+            placeholder="输入号码，如 10086"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="phone-pad"
+            autoFocus
+          />
+          <TouchableOpacity style={styles.doneButton} onPress={addManualSender}>
+            <Text style={styles.doneButtonText}>确定</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+
+    <Modal
+      visible={timeTarget !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setTimeTarget(null)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {timeTarget === 'start' ? '设置开始时间' : '设置结束时间'}
+            </Text>
+            <TouchableOpacity onPress={() => setTimeTarget(null)} hitSlop={8}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.modalInput}
+            value={timeInput}
+            onChangeText={setTimeInput}
+            placeholder="HH:mm，如 08:00"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="numbers-and-punctuation"
+            autoFocus
+          />
+          <TouchableOpacity style={styles.doneButton} onPress={confirmTimeInput}>
+            <Text style={styles.doneButtonText}>确定</Text>
           </TouchableOpacity>
         </View>
       </View>

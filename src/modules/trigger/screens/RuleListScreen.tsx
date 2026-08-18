@@ -218,18 +218,24 @@ export default function RuleListScreen() {
             activeOpacity={1}
             onPress={() => setTemplateVisible(false)}
           />
-          {/* 卡片：绝对定位，点击不触发遮罩关闭 */}
+          {/* 卡片：居中容器，点击不触发遮罩关闭 */}
           <View
             style={{
               position: 'absolute',
-              left: 24,
-              right: 24,
-              top: '12%',
-              backgroundColor: colors.surface,
-              borderRadius: 16,
-              padding: 20,
-              maxHeight: '76%',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              padding: 24,
             }}>
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 16,
+                padding: 20,
+                maxHeight: '85%',
+              }}>
             <Text
               style={{
                 fontSize: 16,
@@ -282,6 +288,7 @@ export default function RuleListScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -391,13 +398,19 @@ export default function RuleListScreen() {
             activeOpacity={1}
             onPress={() => setExportVisible(false)}
           />
-          {/* 卡片：绝对定位，点击不触发遮罩关闭 */}
+          {/* 卡片：居中容器，点击不触发遮罩关闭 */}
           <View
             style={{
               position: 'absolute',
-              left: 24,
-              right: 24,
-              top: '18%',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              padding: 24,
+            }}>
+          <View
+            style={{
               backgroundColor: colors.surface,
               borderRadius: 16,
               padding: 20,
@@ -442,6 +455,7 @@ export default function RuleListScreen() {
             <TouchableOpacity onPress={() => setExportVisible(false)} style={{ marginTop: 12 }}>
               <Text style={{ color: colors.textSecondary, fontSize: 13 }}>关闭</Text>
             </TouchableOpacity>
+          </View>
           </View>
         </View>
       </Modal>

@@ -21,6 +21,18 @@ export interface TriggerRule {
   conditions: TriggerCondition[];
   actions: TriggerAction[];
   createdAt: number;
+  /** 发送人白名单（归一化精确匹配；非空时仅限名单内） */
+  senderWhitelist?: string[];
+  /** 发送人黑名单（归一化精确匹配；命中则排除） */
+  senderBlacklist?: string[];
+  /** 生效时间窗口（窗口外完全静默） */
+  timeWindow?: {
+    enabled: boolean;
+    /** 开始时间 "HH:mm" */
+    start: string;
+    /** 结束时间 "HH:mm" */
+    end: string;
+  };
 }
 
 /** 匹配结果 */

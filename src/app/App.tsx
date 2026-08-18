@@ -6,6 +6,7 @@ import { registerTriggerModule } from '../modules/trigger';
 import { registerReactionModule } from '../modules/reaction';
 import ReactionHome from '../modules/reaction/screens/ReactionHome';
 import ReactionGame from '../modules/reaction/screens/ReactionGame';
+import ReactionResult from '../modules/reaction/screens/ReactionResult';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -70,6 +71,11 @@ function AppNavigator() {
           name="ReactionGame"
           component={ReactionGame}
           options={{ title: '反应力测试' }}
+        />
+        <Stack.Screen
+          name="ReactionResult"
+          component={ReactionResult}
+          options={{ title: '测试结果' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

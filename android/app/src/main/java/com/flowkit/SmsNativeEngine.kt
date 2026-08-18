@@ -21,6 +21,7 @@ import android.provider.Settings
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
 import java.util.regex.Pattern
 
 /**
@@ -79,6 +80,18 @@ object SmsNativeEngine {
             )
           )
         }
+        val whitelist = mutableListOf<String>()
+        obj.optJSONArray("senderWhitelist")?.let { raw ->
+          for (k in 0 until raw.length()) whitelist.add(raw.optString(k, ""))
+        }
+        val blacklist = mutableListOf<String>()
+        obj.optJSONArray("senderBlacklist")?.let { raw ->
+          for (k in 0 until raw.length()) blacklist.add(raw.optString(k, ""))
+        }
+        val tw = obj.optJSONObject("timeWindow")
+        val twEnabled = tw?.optBoolean("enabled", false) ?: false
+        val twStart = tw?.optString("start", "08:00") ?: "08:00"
+        val twEnd = tw?.optString("end", "22:00") ?: "22:00"
         if (obj.optBoolean("enabled", true) && conditions.isNotEmpty() && actions.isNotEmpty()) {
           list.add(
             NativeRule(
@@ -86,6 +99,11 @@ object SmsNativeEngine {
               name = obj.optString("name", ""),
               conditions = conditions,
               actions = actions,
+              senderWhitelist = whitelist,
+              senderBlacklist = blacklist,
+              timeWindowEnabled = twEnabled,
+              timeWindowStart = twStart,
+              timeWindowEnd = twEnd,
             )
           )
         }
@@ -113,6 +131,11 @@ object SmsNativeEngine {
     val name: String,
     val conditions: List<NativeCondition>,
     val actions: List<NativeAction>,
+    val senderWhitelist: List<String>,
+    val senderBlacklist: List<String>,
+    val timeWindowEnabled: Boolean,
+    val timeWindowStart: String,
+    val timeWindowEnd: String,
   )
 
   /** 匹配结果：供 JS 记录触发日志 */
@@ -120,6 +143,28 @@ object SmsNativeEngine {
     val ruleName: String,
     val actionResults: List<Pair<String, Boolean>>,
   )
+
+  /** 号码归一化：去空格/横线/括号，去 +86/0086/86 前缀（与 JS normalizePhone 一致） */
+  private fun normalizePhone(raw: String): String {
+    var s = raw.trim().replace(Regex("[\\s\\-()]"), "")
+    if (s.startsWith("+86") && s.length > 11) s = s.drop(3)
+    if (s.startsWith("0086") && s.length > 11) s = s.drop(4)
+    if (s.startsWith("86") && s.length > 11) s = s.drop(2)
+    return s
+  }
+
+  /** 时间窗口判断（支持跨天，start > end 表示跨天；与 JS inTimeWindow 一致） */
+  private fun inTimeWindow(start: String, end: String): Boolean {
+    fun toMin(t: String): Int {
+      val parts = t.split(":")
+      return (parts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (parts.getOrNull(1)?.toIntOrNull() ?: 0)
+    }
+    val now = Calendar.getInstance()
+    val cur = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+    val s = toMin(start)
+    val e = toMin(end)
+    return if (s <= e) cur >= s && cur <= e else cur >= s || cur <= e
+  }
 
   private fun matchCondition(cond: NativeCondition, sender: String, body: String): Boolean {
     val fieldValue = if (cond.field == "sender") sender else body
@@ -146,6 +191,14 @@ object SmsNativeEngine {
       return null
     }
     val matches = snapshot.filter { rule ->
+      val senderNorm = normalizePhone(sender)
+      // ① 黑名单：命中则排除
+      if (rule.senderBlacklist.isNotEmpty() && rule.senderBlacklist.any { normalizePhone(it) == senderNorm }) return@filter false
+      // ② 白名单：非空时 sender 必须在名单内
+      if (rule.senderWhitelist.isNotEmpty() && rule.senderWhitelist.none { normalizePhone(it) == senderNorm }) return@filter false
+      // ③ 时间窗口：窗口外完全静默
+      if (rule.timeWindowEnabled && !inTimeWindow(rule.timeWindowStart, rule.timeWindowEnd)) return@filter false
+      // ④ 条件（AND）
       rule.conditions.isNotEmpty() && rule.conditions.all { matchCondition(it, sender, body) }
     }
     if (matches.isEmpty()) return null

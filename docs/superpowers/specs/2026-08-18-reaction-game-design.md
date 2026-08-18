@@ -23,12 +23,29 @@ FlowKit 首页新增「⚡ 反应力测试」模块。核心要求：**测试结
 ```
 首页 HomeScreen（模块列表）
   └─「⚡ 反应力测试」模块卡片（moduleRegistry 注册，id: reaction）
-       └─ ReactionScreen（JS 壳：顶部状态区 + 信号区 + 底部控制区）
-            └─ <SignalAreaView>（原生组件 SignalAreaViewManager）
-                 ├─ 经典模式：全屏色块（红→绿）
-                 ├─ 序列模式：2×2 四格，随机格高亮
-                 └─ 追踪模式：目标随机跳位
-                 触摸计时全在原生，结果回调 JS
+       └─ ReactionHome（模式选择页：3 张模式卡片）
+            ├─ 经典反应 → ReactionGame（mode=reaction）
+            ├─ 序列反应 → ReactionGame（mode=sequence）
+            └─ 追踪反应 → ReactionGame（mode=tracking）
+                 └─ 5 轮完成 → ReactionResult（结果页：成绩+评级+重玩/返回）
+```
+
+### 页面结构
+
+1. **ReactionHome（模式选择）**
+   - 3 张模式卡片（⚡ 经典反应 / 🎯 序列反应 / 🎮 追踪反应），各带说明与建议
+   - 点击进入对应模式游戏
+
+2. **ReactionGame（游戏页，mode 参数）**
+   - 顶部状态区：模式名 / 第 N 轮 / 本轮成绩（RN 渲染）
+   - 信号区：原生 SignalAreaView（占 >70% 屏）
+   - 底部控制区：开始 / 结束（RN 渲染）
+   - 5 轮完成 → 跳转结果页
+
+3. **ReactionResult（结果页）**
+   - 汇总：平均 / 最快 / 最慢 / 失误次数
+   - 评级：<200ms 优秀 / <280ms 良好 / <380ms 一般 / 其余 需练习
+   - 按钮：「再玩一次」（回游戏页）/「返回」（回模式选择）
 ```
 
 ## 三个模式（各 5 轮）

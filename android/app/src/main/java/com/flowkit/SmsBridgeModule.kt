@@ -79,6 +79,31 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       )
   }
 
+  /** 原生已执行动作：事件携带命中信息，JS 仅记录日志不重复执行 */
+  private fun sendEventWithLog(sender: String, body: String, match: SmsNativeEngine.NativeMatch) {
+    reactContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      ?.emit(
+        EVENT_NAME,
+        Arguments.createMap().apply {
+          putString("sender", sender)
+          putString("body", body)
+          putBoolean("nativeHandled", true)
+          putString("ruleName", match.ruleName)
+          val actionResults = Arguments.createArray()
+          for ((type, ok) in match.actionResults) {
+            actionResults.pushMap(
+              Arguments.createMap().apply {
+                putString("type", type)
+                putBoolean("success", ok)
+              }
+            )
+          }
+          putArray("actionResults", actionResults)
+        }
+      )
+  }
+
   /** 短信数据库监听：小米 ROM 不分发 SMS_RECEIVED 广播，改为监听短信库变化 */
   private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
     override fun onChange(selfChange: Boolean) {
@@ -109,6 +134,12 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
   @ReactMethod
   fun refreshWatcher() {
     registerSmsWatcher()
+  }
+
+  /** JS 同步规则快照（锁屏时原生闭环匹配用） */
+  @ReactMethod
+  fun setRules(rulesJson: String?) {
+    SmsNativeEngine.setRules(rulesJson)
   }
 
   companion object {
@@ -142,7 +173,14 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
               val sender = c.getString(1) ?: ""
               val body = c.getString(2) ?: ""
               Log.d("SmsBridge", "DB 新短信 #$id from $sender: $body")
-              emitSms(sender, body)
+              // 原生闭环优先：匹配规则并原生执行动作（锁屏时不依赖 JS）
+              val match = SmsNativeEngine.handleSms(context, sender, body)
+              if (match != null) {
+                // 原生已处理：通知 JS 记录日志（不重复执行动作）
+                emitSmsWithLog(sender, body, match)
+              } else {
+                emitSms(sender, body)
+              }
             }
           }
         }
@@ -155,6 +193,12 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     fun emitSms(sender: String, body: String) {
       pendingSms = sender to body
       instance?.sendEvent(sender, body)
+    }
+
+    /** 原生已执行动作：事件携带命中信息，JS 仅记录日志 */
+    private fun emitSmsWithLog(sender: String, body: String, match: SmsNativeEngine.NativeMatch) {
+      pendingSms = sender to body
+      instance?.sendEventWithLog(sender, body, match)
     }
   }
 

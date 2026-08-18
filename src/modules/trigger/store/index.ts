@@ -4,6 +4,7 @@ import { RuleStorage } from '../services/RuleStorage';
 import { RuleEngine } from '../services/RuleEngine';
 import { ActionExecutor } from '../services/ActionExecutor';
 import { useSmsLogStore } from '../services/SmsLogStore';
+import { syncRulesToNative, type NativeHandledInfo } from '../services/SmsBridge';
 import { generateId } from '../../../shared/types';
 
 interface TriggerState {
@@ -18,7 +19,11 @@ interface TriggerState {
   toggleRule: (id: string) => Promise<void>;
   duplicateRule: (id: string) => Promise<void>;
   loadLogs: () => Promise<void>;
-  processSms: (sender: string, body: string) => Promise<void>;
+  processSms: (
+    sender: string,
+    body: string,
+    nativeInfo?: NativeHandledInfo,
+  ) => Promise<void>;
 }
 
 export const useTriggerStore = create<TriggerState>((set, get) => ({
@@ -29,6 +34,7 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
   async loadRules() {
     const rules = await RuleStorage.loadRules();
     set({ rules });
+    syncRulesToNative();
   },
 
   async addRule(input) {
@@ -40,6 +46,7 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     const rules = [...get().rules, newRule];
     await RuleStorage.saveRules(rules);
     set({ rules });
+    syncRulesToNative();
   },
 
   async updateRule(id, updates) {
@@ -48,12 +55,14 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     );
     await RuleStorage.saveRules(rules);
     set({ rules });
+    syncRulesToNative();
   },
 
   async deleteRule(id) {
     const rules = get().rules.filter((r) => r.id !== id);
     await RuleStorage.saveRules(rules);
     set({ rules });
+    syncRulesToNative();
   },
 
   async toggleRule(id) {
@@ -62,6 +71,7 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     );
     await RuleStorage.saveRules(rules);
     set({ rules });
+    syncRulesToNative();
   },
 
   async duplicateRule(id) {
@@ -83,15 +93,21 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     set({ logs });
   },
 
-  async processSms(sender, body) {
+  async processSms(sender, body, nativeInfo) {
     const { rules } = get();
     // 若内存无日志（如进程刚启动），先从存储加载，避免覆盖历史
     if (get().logs.length === 0) {
       await get().loadLogs();
     }
     const { logs } = get();
-    const matches = RuleEngine.compare({ sender, body }, rules);
-    const matchedRuleNames = matches.map((m) => m.rule.name);
+
+    // 记录短信记录（无论是否命中）
+    const matches = nativeInfo
+      ? []
+      : RuleEngine.compare({ sender, body }, rules);
+    const matchedRuleNames = nativeInfo
+      ? [nativeInfo.ruleName]
+      : matches.map((m) => m.rule.name);
     await useSmsLogStore.getState().add({
       id: generateId(),
       sender,
@@ -99,6 +115,27 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
       receivedAt: Date.now(),
       matchedRuleNames,
     });
+
+    if (nativeInfo) {
+      // 原生闭环已执行动作：仅记录触发日志（不重复执行）
+      const nativeLog: ExecutionLog = {
+        id: generateId(),
+        ruleId: 'native',
+        ruleName: nativeInfo.ruleName,
+        smsSender: sender,
+        smsBody: body,
+        triggeredAt: Date.now(),
+        actions: nativeInfo.actionResults.map((a) => ({
+          type: a.type,
+          success: a.success,
+        })),
+      };
+      const updatedLogs = [...logs, nativeLog];
+      await RuleStorage.saveLogs(updatedLogs);
+      set({ logs: updatedLogs });
+      return;
+    }
+
     if (matches.length > 0) {
       const newLogs = await ActionExecutor.execute(matches, { sender, body });
       const updatedLogs = [...logs, ...newLogs];

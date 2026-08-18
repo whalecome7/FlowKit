@@ -1,10 +1,12 @@
 package com.flowkit
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -12,11 +14,12 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 
-/** 保活前台服务：常驻通知 + 短信库低频轮询兜底（小米锁屏屏蔽广播时的替代路径） */
+/** 保活前台服务：常驻通知 + 短信库轮询 + AlarmManager 精确唤醒兜底（防服务被杀） */
 class KeepAliveService : Service() {
 
   private val handler = Handler(Looper.getMainLooper())
   private val pollIntervalMs = 10_000L
+  private val alarmIntervalMs = 30_000L
 
   /** 每 10 秒检查一次短信库（id 去重，广播正常时不会重复触发） */
   private val pollTask = object : Runnable {
@@ -29,10 +32,34 @@ class KeepAliveService : Service() {
     }
   }
 
+  /** 注册 AlarmManager 精确唤醒（充电/活跃时 30 秒一次，防服务被杀后失联） */
+  private fun scheduleAlarm() {
+    val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+    val intent = Intent(this, KeepAliveAlarmReceiver::class.java)
+    val pendingIntent = PendingIntent.getBroadcast(
+      this, 0, intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    try {
+      alarmManager.setExactAndAllowWhileIdle(
+        AlarmManager.RTC_WAKEUP,
+        System.currentTimeMillis() + alarmIntervalMs,
+        pendingIntent
+      )
+    } catch (e: Exception) {
+      // 某些 ROM 限制高频精确闹钟，降级为 set
+      try {
+        alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + alarmIntervalMs, pendingIntent)
+      } catch (e2: Exception) {
+      }
+    }
+  }
+
   override fun onCreate() {
     super.onCreate()
     startForegroundCompat()
     handler.post(pollTask)
+    scheduleAlarm()
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

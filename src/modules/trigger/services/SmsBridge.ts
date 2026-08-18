@@ -1,9 +1,15 @@
 import { NativeModules, DeviceEventEmitter } from 'react-native';
-import { useTriggerStore } from '../store';
+import type { TriggerRule } from '../types';
 
 const { SmsBridge } = NativeModules;
 
 let initialized = false;
+
+/** 原生闭环事件：原生已匹配并执行动作时的补充信息 */
+export interface NativeHandledInfo {
+  ruleName: string;
+  actionResults: { type: string; success: boolean }[];
+}
 
 /**
  * 初始化短信桥接：注册事件监听 + 竞态补发 + 启动保活服务。
@@ -15,10 +21,27 @@ let initialized = false;
 export function initSmsBridge(): void {
   if (!SmsBridge || initialized) return;
 
+  // 延迟获取 store（避免 SmsBridge ↔ store 循环依赖初始化问题）
+  const { useTriggerStore } = require('../store');
+
   DeviceEventEmitter.addListener(
     'onSmsReceived',
-    (event: { sender: string; body: string }) => {
-      void useTriggerStore.getState().processSms(event.sender, event.body);
+    (event: {
+      sender: string;
+      body: string;
+      nativeHandled?: boolean;
+      ruleName?: string;
+      actionResults?: { type: string; success: boolean }[];
+    }) => {
+      const nativeInfo: NativeHandledInfo | undefined = event.nativeHandled
+        ? {
+            ruleName: event.ruleName ?? '',
+            actionResults: event.actionResults ?? [],
+          }
+        : undefined;
+      void useTriggerStore
+        .getState()
+        .processSms(event.sender, event.body, nativeInfo);
     },
   );
 
@@ -37,7 +60,23 @@ export function initSmsBridge(): void {
   // 尝试注册短信数据库监听（READ_SMS 已授权时；未授权则等授权后 refreshWatcher）
   SmsBridge.refreshWatcher?.();
 
+  // 同步规则快照到原生（锁屏时原生闭环匹配用）
+  syncRulesToNative();
+
   initialized = true;
+}
+
+/** 同步规则快照到原生（规则变化时也调用） */
+export function syncRulesToNative(): void {
+  if (!SmsBridge?.setRules) return;
+  try {
+    // 延迟获取 store（避免循环依赖）
+    const { useTriggerStore } = require('../store');
+    const rules: TriggerRule[] = useTriggerStore.getState().rules;
+    SmsBridge.setRules(JSON.stringify(rules));
+  } catch {
+    // 忽略同步失败（原生未就绪时下次规则变化再同步）
+  }
 }
 
 /** 查询电池白名单状态 */

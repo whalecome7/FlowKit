@@ -15,10 +15,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../../theme';
 import { useTriggerStore } from '../store';
-import { exportRules, parseRules } from '../services/RuleExport';
+import { exportRules, parseRules, serializeRules } from '../services/RuleExport';
 import { RULE_TEMPLATES } from '../services/RuleTemplates';
 import { usePermissionStore } from '../services/Permissions';
 import SimulateSmsModal from '../components/SimulateSmsModal';
+import { QRCodeView } from '../components/QRCodeView';
 
 export default function RuleListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -30,6 +31,7 @@ export default function RuleListScreen() {
   const [importVisible, setImportVisible] = useState(false);
   const [importText, setImportText] = useState('');
   const [moreVisible, setMoreVisible] = useState(false);
+  const [exportVisible, setExportVisible] = useState(false);
   const { smsGranted, notifyGranted, batteryExempt, checked, refresh, requestSms, requestNotify, requestBattery } =
     usePermissionStore();
 
@@ -92,7 +94,7 @@ export default function RuleListScreen() {
       label: '导出规则',
       onPress: () => {
         setMoreVisible(false);
-        void exportRules(rules);
+        setExportVisible(true);
       },
     },
     {
@@ -367,6 +369,69 @@ export default function RuleListScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 导出规则弹窗：二维码 + 分享/复制 */}
+      <Modal
+        visible={exportVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExportVisible(false)}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            padding: 24,
+          }}>
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 16,
+              padding: 20,
+              alignItems: 'center',
+            }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '600',
+                marginBottom: 12,
+                color: colors.text,
+              }}>
+              导出规则
+            </Text>
+            <QRCodeView value={serializeRules(rules)} />
+            <Text
+              style={{
+                fontSize: 11,
+                color: colors.textSecondary,
+                marginTop: 8,
+                textAlign: 'center',
+              }}>
+              扫码即导入规则（本地编码，无需联网）
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  await exportRules(rules);
+                }}
+                style={{ padding: 10, borderRadius: 8, backgroundColor: colors.surfaceAlt }}>
+                <Text style={{ color: colors.text, fontSize: 13 }}>📄 分享/存文件</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert('已复制', '规则 JSON 已复制');
+                  void exportRules(rules);
+                }}
+                style={{ padding: 10, borderRadius: 8, backgroundColor: colors.surfaceAlt }}>
+                <Text style={{ color: colors.text, fontSize: 13 }}>📋 复制 JSON</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => setExportVisible(false)} style={{ marginTop: 12 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>关闭</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

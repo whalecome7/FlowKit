@@ -133,7 +133,8 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
         })),
       };
       const updatedLogs = [...logs, nativeLog];
-      await RuleStorage.saveLogs(updatedLogs);
+      // 只传新增日志（saveLogs 内部会读存储合并，避免历史重复累积）
+      await RuleStorage.saveLogs([nativeLog]);
       set({ logs: updatedLogs });
       return;
     }
@@ -141,7 +142,8 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     if (matches.length > 0) {
       const newLogs = await ActionExecutor.execute(matches, { sender, body });
       const updatedLogs = [...logs, ...newLogs];
-      await RuleStorage.saveLogs(updatedLogs);
+      // 只传新增日志（saveLogs 内部会读存储合并，避免历史重复累积）
+      await RuleStorage.saveLogs(newLogs);
       set({ logs: updatedLogs });
     }
   },

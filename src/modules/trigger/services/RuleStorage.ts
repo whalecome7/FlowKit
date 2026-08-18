@@ -24,7 +24,26 @@ export const RuleStorage = {
     const raw = await AsyncStorage.getItem(LOGS_KEY);
     if (!raw) return [];
     try {
-      return JSON.parse(raw) as T[];
+      const list = JSON.parse(raw) as T[];
+      // 一次性迁移：按「短信内容 + 60 秒窗口」去重（清理历史重复累积的日志）
+      const seen = new Map<string, number>();
+      const deduped = list.filter((l) => {
+        const item = l as {
+          smsSender?: string;
+          smsBody?: string;
+          triggeredAt?: number;
+        };
+        const key = `${item.smsSender ?? ''}|${item.smsBody ?? ''}`;
+        const last = seen.get(key);
+        const ts = item.triggeredAt ?? 0;
+        if (last !== undefined && ts - last < 60_000) return false;
+        seen.set(key, ts);
+        return true;
+      });
+      if (deduped.length !== list.length) {
+        await AsyncStorage.setItem(LOGS_KEY, JSON.stringify(deduped));
+      }
+      return deduped;
     } catch {
       return [];
     }

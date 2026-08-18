@@ -5,15 +5,16 @@ interface SmsPayload {
   body: string;
 }
 
-/** 号码归一化：去空格/横线/括号，去 +86/0086 前缀 */
-export function normalizePhone(raw: string): string {
+/** 号码归一化：去空格/横线/括号，去 +86/0086/86 国家码前缀（仅当长度 > 11） */
+export function normalizePhone(raw: string | null | undefined): string {
   let s = (raw ?? '').trim().replace(/[\s\-()]/g, '');
   if (s.startsWith('+86') && s.length > 11) s = s.slice(3);
   if (s.startsWith('0086') && s.length > 11) s = s.slice(4);
+  if (s.startsWith('86') && s.length > 11) s = s.slice(2);
   return s;
 }
 
-/** 时间窗口判断（支持跨天，start > end 表示跨天） */
+/** 时间窗口判断（支持跨天，start > end 表示跨天；start === end 表示仅该整点命中） */
 export function inTimeWindow(
   window: { start: string; end: string },
   now: Date = new Date(),
@@ -56,18 +57,13 @@ export const RuleEngine = {
   matchRule(rule: TriggerRule, sms: SmsPayload, now: Date = new Date()): MatchResult | null {
     if (!rule.enabled || rule.conditions.length === 0) return null;
 
+    const sender = normalizePhone(sms.sender);
     // ① 黑名单：命中则排除
-    if (
-      rule.senderBlacklist?.length &&
-      rule.senderBlacklist.map(normalizePhone).includes(normalizePhone(sms.sender))
-    ) {
+    if (rule.senderBlacklist?.length && rule.senderBlacklist.map(normalizePhone).includes(sender)) {
       return null;
     }
     // ② 白名单：非空时 sender 必须在名单内
-    if (
-      rule.senderWhitelist?.length &&
-      !rule.senderWhitelist.map(normalizePhone).includes(normalizePhone(sms.sender))
-    ) {
+    if (rule.senderWhitelist?.length && !rule.senderWhitelist.map(normalizePhone).includes(sender)) {
       return null;
     }
     // ③ 时间窗口：窗口外完全静默

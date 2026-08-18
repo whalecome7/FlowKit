@@ -21,6 +21,12 @@ describe('normalizePhone', () => {
   it('去掉 0086 前缀', () => {
     expect(normalizePhone('008618650301429')).toBe('18650301429');
   });
+  it('去掉裸 86 前缀（长度 > 11）', () => {
+    expect(normalizePhone('8618650301429')).toBe('18650301429');
+  });
+  it('11 位 86 开头号码不剥离', () => {
+    expect(normalizePhone('86150301429')).toBe('86150301429');
+  });
 });
 
 describe('inTimeWindow', () => {
@@ -39,6 +45,17 @@ describe('inTimeWindow', () => {
   });
   it('跨天窗口（22:00-08:00）白天不命中', () => {
     expect(inTimeWindow({ start: '22:00', end: '08:00' }, t(12))).toBe(false);
+  });
+  it('普通窗口端点：整点含端点', () => {
+    expect(inTimeWindow({ start: '08:00', end: '22:00' }, t(8))).toBe(true);
+    expect(inTimeWindow({ start: '08:00', end: '22:00' }, t(22))).toBe(true);
+    expect(inTimeWindow({ start: '08:00', end: '22:00' }, t(22, 1))).toBe(false);
+    expect(inTimeWindow({ start: '08:00', end: '22:00' }, t(7, 59))).toBe(false);
+  });
+  it('跨天窗口端点：整点含端点', () => {
+    expect(inTimeWindow({ start: '22:00', end: '08:00' }, t(22))).toBe(true);
+    expect(inTimeWindow({ start: '22:00', end: '08:00' }, t(8))).toBe(true);
+    expect(inTimeWindow({ start: '22:00', end: '08:00' }, t(8, 1))).toBe(false);
   });
 });
 
@@ -84,5 +101,24 @@ describe('matchRule 过滤', () => {
   });
   it('旧规则无 timeWindow 字段：不限制', () => {
     expect(RuleEngine.matchRule(baseRule, sms, new Date(2026, 7, 18, 23))).not.toBeNull();
+  });
+  it('timeWindow.enabled=false 不限制', () => {
+    const rule = {
+      ...baseRule,
+      timeWindow: { enabled: false, start: '08:00', end: '22:00' },
+    };
+    expect(RuleEngine.matchRule(rule, sms, new Date(2026, 7, 18, 23))).not.toBeNull();
+  });
+  it('空黑白名单视为不限制', () => {
+    const rule = { ...baseRule, senderWhitelist: [], senderBlacklist: [] };
+    expect(RuleEngine.matchRule(rule, sms)).not.toBeNull();
+  });
+  it('白名单命中且黑名单未命中 → 放行', () => {
+    const rule = {
+      ...baseRule,
+      senderWhitelist: ['18650301429'],
+      senderBlacklist: ['10086'],
+    };
+    expect(RuleEngine.matchRule(rule, sms)).not.toBeNull();
   });
 });

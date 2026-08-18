@@ -2,10 +2,9 @@ import { Share } from 'react-native';
 import type { TriggerRule } from '../types';
 
 export function serializeRules(rules: TriggerRule[]): string {
+  // 紧凑 JSON（无缩进）：显著减小二维码矩阵，导入端解析不受影响
   return JSON.stringify(
     { app: 'FlowKit', version: 1, exportedAt: Date.now(), rules },
-    null,
-    2,
   );
 }
 

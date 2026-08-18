@@ -21,7 +21,7 @@ export function QRCodeView({
 
   const matrix = useMemo(() => {
     try {
-      const qr = qrcode(0, 'M');
+      const qr = qrcode(0, 'L'); // L 级纠错（7%）：矩阵更小更稀疏，规则 JSON 足够
       qr.addData(value);
       qr.make();
       const count = qr.getModuleCount();

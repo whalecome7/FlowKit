@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
 import { registerTriggerModule } from '../modules/trigger';
+import { registerReactionModule } from '../modules/reaction';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -13,6 +14,7 @@ import { navigationRef } from '../modules/trigger/services/NotificationNavigatio
 
 // 注册所有模块
 registerTriggerModule();
+registerReactionModule();
 
 const Stack = createNativeStackNavigator();
 

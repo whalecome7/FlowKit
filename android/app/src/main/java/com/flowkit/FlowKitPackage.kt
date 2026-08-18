@@ -10,6 +10,7 @@ class FlowKitPackage : ReactPackage {
   override fun createNativeModules(
     reactContext: ReactApplicationContext
   ): List<NativeModule> = listOf(
+    ContactsModule(reactContext),
     RingtoneModule(reactContext),
     SmsBridgeModule(reactContext),
     VibrationModule(reactContext),

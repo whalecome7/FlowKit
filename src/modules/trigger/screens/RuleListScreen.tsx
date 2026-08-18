@@ -79,6 +79,13 @@ export default function RuleListScreen() {
       },
     },
     {
+      label: '触发统计',
+      onPress: () => {
+        setMoreVisible(false);
+        navigation.navigate('TriggerStatistics');
+      },
+    },
+    {
       label: '导出规则',
       onPress: () => {
         setMoreVisible(false);

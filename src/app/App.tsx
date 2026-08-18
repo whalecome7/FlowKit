@@ -7,6 +7,7 @@ import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
 import DiagnosticsScreen from '../modules/trigger/screens/DiagnosticsScreen';
+import StatisticsScreen from '../modules/trigger/screens/StatisticsScreen';
 import { ThemeProvider, useTheme } from '../theme';
 import { navigationRef } from '../modules/trigger/services/NotificationNavigation';
 
@@ -50,6 +51,11 @@ function AppNavigator() {
           name="TriggerDiagnostics"
           component={DiagnosticsScreen}
           options={{ title: '自诊断' }}
+        />
+        <Stack.Screen
+          name="TriggerStatistics"
+          component={StatisticsScreen}
+          options={{ title: '触发统计' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

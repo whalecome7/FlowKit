@@ -42,8 +42,8 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
       ...input,
       id: generateId(),
       createdAt: Date.now(),
-      // 新规则默认 08:00-22:00 生效（旧数据无此字段不受影响）
-      timeWindow: { enabled: true, start: '08:00', end: '22:00' },
+      // 未设置时间窗口时默认 08:00-22:00（用户显式设置则保留）
+      timeWindow: input.timeWindow ?? { enabled: true, start: '08:00', end: '22:00' },
     };
     const rules = [...get().rules, newRule];
     await RuleStorage.saveRules(rules);

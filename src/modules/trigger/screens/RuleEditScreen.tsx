@@ -18,6 +18,7 @@ import type { TriggerCondition, TriggerAction } from '../types';
 import { ACTION_META, getActionMeta } from '../types';
 import ConditionEditor from '../components/ConditionEditor';
 import ActionEditor from '../components/ActionEditor';
+import PromptInputModal from '../components/PromptInputModal';
 
 type RouteParams = {
   TriggerRuleEdit: { ruleId?: string };
@@ -199,19 +200,24 @@ export default function RuleEditScreen() {
       Alert.alert('提示', '请输入号码');
       return;
     }
+    const current =
+      manualTarget === 'whitelist'
+        ? senderWhitelist
+        : manualTarget === 'blacklist'
+          ? senderBlacklist
+          : null;
+    if (current && current.includes(value)) {
+      Alert.alert('提示', '该号码已存在');
+      return;
+    }
     if (manualTarget === 'whitelist') {
-      setSenderWhitelist((prev) =>
-        prev.includes(value) ? prev : [...prev, value],
-      );
+      setSenderWhitelist((prev) => [...prev, value]);
     } else if (manualTarget === 'blacklist') {
-      setSenderBlacklist((prev) =>
-        prev.includes(value) ? prev : [...prev, value],
-      );
+      setSenderBlacklist((prev) => [...prev, value]);
     } else {
       return;
     }
     setManualTarget(null);
-    setManualInput('');
   };
 
   const openTimeInput = (target: 'start' | 'end') => {
@@ -222,17 +228,25 @@ export default function RuleEditScreen() {
   const confirmTimeInput = () => {
     if (!timeTarget) return;
     const value = timeInput.trim();
-    if (!/^\d{1,2}:\d{2}$/.test(value)) {
-      Alert.alert('提示', '请输入合法时间（HH:mm）');
+    const timePattern = /^(\d{1,2}):(\d{2})$/;
+    const m = value.match(timePattern);
+    if (!m) {
+      Alert.alert('提示', '请输入正确时间，如 08:30');
       return;
     }
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h > 23 || min > 59) {
+      Alert.alert('提示', '时间不合法（时 0-23，分 0-59）');
+      return;
+    }
+    const normalized = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
     if (timeTarget === 'start') {
-      setTimeWindowStart(value);
+      setTimeWindowStart(normalized);
     } else {
-      setTimeWindowEnd(value);
+      setTimeWindowEnd(normalized);
     }
     setTimeTarget(null);
-    setTimeInput('');
   };
 
   const renderSenderList = (
@@ -461,16 +475,6 @@ export default function RuleEditScreen() {
           color: colors.text,
           marginRight: 8,
         },
-        modalInput: {
-          backgroundColor: colors.surfaceAlt,
-          borderRadius: 10,
-          padding: 12,
-          fontSize: 16,
-          color: colors.text,
-          borderWidth: 1,
-          borderColor: colors.border,
-          marginBottom: 12,
-        },
         empty: {
           fontSize: 13,
           color: colors.textMuted,
@@ -532,7 +536,7 @@ export default function RuleEditScreen() {
         <Text style={styles.sectionTitle}>发送人过滤</Text>
       </View>
       <Text style={styles.filterHint}>
-        白名单优先，黑名单排除；号码自动归一化匹配
+        黑名单优先排除；白名单非空时仅限名单内号码
       </Text>
       {renderSenderList(
         '仅限以下发送人',
@@ -689,71 +693,28 @@ export default function RuleEditScreen() {
       </View>
     </Modal>
 
-    <Modal
+    <PromptInputModal
       visible={manualTarget !== null}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setManualTarget(null)}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {manualTarget === 'whitelist'
-                ? '添加白名单号码'
-                : '添加黑名单号码'}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setManualTarget(null)}
-              hitSlop={8}>
-              <Text style={styles.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            style={styles.modalInput}
-            value={manualInput}
-            onChangeText={setManualInput}
-            placeholder="输入号码，如 10086"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="phone-pad"
-            autoFocus
-          />
-          <TouchableOpacity style={styles.doneButton} onPress={addManualSender}>
-            <Text style={styles.doneButtonText}>确定</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+      title={manualTarget === 'whitelist' ? '添加白名单号码' : '添加黑名单号码'}
+      placeholder="输入号码，如 10086"
+      keyboardType="phone-pad"
+      value={manualInput}
+      onChangeText={setManualInput}
+      onConfirm={addManualSender}
+      onClose={() => setManualTarget(null)}
+    />
 
-    <Modal
+    <PromptInputModal
       visible={timeTarget !== null}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setTimeTarget(null)}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {timeTarget === 'start' ? '设置开始时间' : '设置结束时间'}
-            </Text>
-            <TouchableOpacity onPress={() => setTimeTarget(null)} hitSlop={8}>
-              <Text style={styles.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            style={styles.modalInput}
-            value={timeInput}
-            onChangeText={setTimeInput}
-            placeholder="HH:mm，如 08:00"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="numbers-and-punctuation"
-            autoFocus
-          />
-          <TouchableOpacity style={styles.doneButton} onPress={confirmTimeInput}>
-            <Text style={styles.doneButtonText}>确定</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+      title={timeTarget === 'start' ? '设置开始时间' : '设置结束时间'}
+      placeholder="HH:mm，如 08:00"
+      keyboardType="numbers-and-punctuation"
+      value={timeInput}
+      onChangeText={setTimeInput}
+      onConfirm={confirmTimeInput}
+      onClose={() => setTimeTarget(null)}
+      onSubmitEditing={confirmTimeInput}
+    />
     </>
   );
 }

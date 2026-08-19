@@ -106,9 +106,9 @@ class SignalAreaView(context: Context) : View(context) {
   private fun drawReaction(canvas: Canvas) {
     canvas.drawColor(
       when (phase) {
-        Phase.READY -> COLOR_READY
-        Phase.FAULT -> COLOR_FAULT
-        Phase.WAITING, Phase.DONE, Phase.IDLE -> COLOR_WAIT
+        Phase.READY -> COLOR_READY          // 信号：绿
+        Phase.FAULT -> COLOR_WAIT           // 失误：灰（与等待红区分）
+        Phase.WAITING, Phase.DONE, Phase.IDLE -> COLOR_FAULT  // 等待：红（红→绿惯例）
       }
     )
   }

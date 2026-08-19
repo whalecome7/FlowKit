@@ -37,21 +37,23 @@ export default function ReactionGame() {
   const [lastResult, setLastResult] = useState<RoundResult | null>(null);
   const resultsRef = useRef<RoundResult[]>([]);
 
-  const startRound = () => {
-    setLastResult(null);
-    setRunning(true);   // running false→true 触发原生 startRound
-  };
-
   const onRoundResult = (e: { nativeEvent: RoundResult }) => {
     const r = e.nativeEvent;
     const next = [...resultsRef.current, r];
     resultsRef.current = next;
     setLastResult(r);
     setRound(next.length);
-    setRunning(false);  // 复位，下一轮可再次触发
+    setRunning(false);  // 复位，等待用户点色块继续
     if (next.length >= TOTAL_ROUNDS) {
       navigation.navigate('ReactionResult', { mode, results: next });
     }
+  };
+
+  /** 色块区点击「开始/继续」：开始第一轮或下一轮 */
+  const onContinue = () => {
+    if (resultsRef.current.length >= TOTAL_ROUNDS) return;
+    setLastResult(null);
+    setRunning(true);
   };
 
   return (
@@ -69,29 +71,22 @@ export default function ReactionGame() {
         )}
       </View>
 
-      {/* 信号区（原生，触摸计时） */}
+      {/* 信号区（原生，触摸计时 + 点击继续） */}
       <View style={styles.signalWrap}>
         <SignalAreaNative
           style={{ flex: 1 }}
           mode={mode}
           running={running}
           onRoundResult={onRoundResult}
+          onContinue={onContinue}
         />
       </View>
 
-      {/* 底部控制区 */}
+      {/* 底部控制区：仅退出（开始/继续在色块区完成） */}
       <View style={styles.controlBar}>
-        {!running ? (
-          <TouchableOpacity
-            onPress={startRound}
-            style={[styles.btn, { backgroundColor: '#30A46C' }]}>
-            <Text style={styles.btnText}>
-              {round === 0 ? '开始测试' : '下一轮'}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <Text style={{ color: colors.textSecondary, fontSize: 14 }}>等待信号…</Text>
-        )}
+        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+          {running ? '等待信号…' : '点击色块开始 / 继续'}
+        </Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
           <Text style={{ color: colors.textSecondary }}>退出</Text>
         </TouchableOpacity>

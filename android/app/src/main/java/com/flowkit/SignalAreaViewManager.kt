@@ -24,7 +24,8 @@ class SignalAreaViewManager : SimpleViewManager<SignalAreaView>() {
 
   override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> {
     return mutableMapOf(
-      "onRoundResult" to mapOf("registrationName" to "onRoundResult")
+      "onRoundResult" to mapOf("registrationName" to "onRoundResult"),
+      "onContinue" to mapOf("registrationName" to "onContinue"),
     )
   }
 }

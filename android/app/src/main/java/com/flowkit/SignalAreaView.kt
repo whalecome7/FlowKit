@@ -44,6 +44,7 @@ class SignalAreaView(context: Context) : View(context) {
   @Volatile var phase: Phase = Phase.IDLE
     private set
   private var t0 = 0L
+  private var lastTimeMs = 0L           // 最近一轮成绩（状态文字显示）
   private var highlightIndex = 0      // SEQUENCE 高亮格（0-3）
   private var targetX = 0f             // TRACKING 目标圆心
   private var targetY = 0f
@@ -109,11 +110,13 @@ class SignalAreaView(context: Context) : View(context) {
   private fun drawReaction(canvas: Canvas) {
     canvas.drawColor(
       when (phase) {
-        Phase.READY -> COLOR_READY          // 信号：绿
-        Phase.FAULT -> COLOR_WAIT           // 失误：灰（与等待红区分）
-        Phase.WAITING, Phase.DONE, Phase.IDLE -> COLOR_FAULT  // 等待：红（红→绿惯例）
+        Phase.IDLE -> COLOR_WAIT               // 初始：灰
+        Phase.WAITING -> COLOR_FAULT           // 等待：红
+        Phase.READY, Phase.DONE -> COLOR_READY // 信号+完成：绿（完成保持绿，避免红→绿→红闪变刺眼）
+        Phase.FAULT -> COLOR_WAIT              // 失误：灰
       }
     )
+    drawStatusText(canvas)
   }
 
   private fun drawSequence(canvas: Canvas) {
@@ -130,6 +133,7 @@ class SignalAreaView(context: Context) : View(context) {
       paint.color = if (isHighlight) COLOR_READY else COLOR_WAIT
       canvas.drawRect(l.toFloat(), t.toFloat(), (l + cw).toFloat(), (t + ch).toFloat(), paint)
     }
+    drawStatusText(canvas)
   }
 
   private fun drawTracking(canvas: Canvas) {
@@ -140,6 +144,23 @@ class SignalAreaView(context: Context) : View(context) {
     paint.textSize = targetRadius * 0.8f
     paint.textAlign = Paint.Align.CENTER
     canvas.drawText("点击", targetX, targetY + targetRadius * 0.28f, paint)
+    drawStatusText(canvas)
+  }
+
+  /** 状态引导文字：IDLE 点击开始 / DONE 点击继续 / FAULT 失误点击继续 */
+  private fun drawStatusText(canvas: Canvas) {
+    val text = when (phase) {
+      Phase.IDLE -> "⚡ 点击开始"
+      Phase.DONE -> "本轮 $lastTimeMs ms · 点击继续"
+      Phase.FAULT -> "失误 · 点击继续"
+      else -> null
+    } ?: return
+    paint.color = Color.WHITE
+    paint.textSize = minOf(width, height) * 0.055f
+    paint.textAlign = Paint.Align.CENTER
+    paint.isFakeBoldText = true
+    canvas.drawText(text, width / 2f, height / 2f + paint.textSize * 0.35f, paint)
+    paint.isFakeBoldText = false
   }
 
   override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -162,11 +183,14 @@ class SignalAreaView(context: Context) : View(context) {
           invalidate()
           emitResult(dt, true)
         } else {
+          lastTimeMs = dt
           phase = Phase.DONE
           invalidate()
           emitResult(dt, false)
         }
       }
+      // 点击继续：IDLE（第一轮开始）/ DONE / FAULT（下一轮）→ 通知 JS
+      Phase.IDLE, Phase.DONE, Phase.FAULT -> emitContinue()
       else -> Unit
     }
     return true
@@ -205,5 +229,13 @@ class SignalAreaView(context: Context) : View(context) {
     map.putBoolean("isFault", isFault)
     ctx.getJSModule(RCTEventEmitter::class.java)
       .receiveEvent(id, "onRoundResult", map)
+  }
+
+  /** 用户点击「开始/继续」（IDLE 第一轮 / DONE / FAULT 下一轮） */
+  private fun emitContinue() {
+    val ctx = context
+    if (ctx !is ReactContext || id == View.NO_ID) return
+    ctx.getJSModule(RCTEventEmitter::class.java)
+      .receiveEvent(id, "onContinue", Arguments.createMap())
   }
 }

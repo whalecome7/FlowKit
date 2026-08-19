@@ -65,9 +65,12 @@ class SignalAreaView(context: Context) : View(context) {
     invalidate()
   }
 
-  /** JS 开始一轮：进入等待，随机延迟后变信号 */
+  /** JS 开始一轮：每轮随机高亮格/目标位置，进入等待，随机延迟后变信号 */
   fun startRound() {
     if (phase == Phase.READY || phase == Phase.WAITING) return
+    // 每轮随机：序列模式随机高亮格，追踪模式随机目标位置（修复固定第一格/固定位置 bug）
+    if (mode == MODE_SEQUENCE) highlightIndex = Random.nextInt(4)
+    if (mode == MODE_TRACKING) randomizeTarget()
     phase = Phase.WAITING
     invalidate()
     handler.removeCallbacks(readyRunnable)

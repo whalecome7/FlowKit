@@ -82,7 +82,7 @@ export default function ReactionResult() {
         <Text style={styles.btnText}>再玩一次</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        onPress={() => navigation.popToTop()}
+        onPress={() => navigation.navigate('ReactionHome')}
         style={{ padding: 12 }}>
         <Text style={{ color: colors.textSecondary }}>返回模式选择</Text>
       </TouchableOpacity>

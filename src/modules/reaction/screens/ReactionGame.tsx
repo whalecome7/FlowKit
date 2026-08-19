@@ -58,17 +58,15 @@ export default function ReactionGame() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* 顶部状态区 */}
+      {/* 顶部状态区（成绩行恒占位，避免高度变化导致色块跳动） */}
       <View style={styles.statusBar}>
         <Text style={[styles.modeLabel, { color: colors.text }]}>{MODE_LABEL[mode]}</Text>
         <Text style={[styles.roundText, { color: colors.textSecondary }]}>
           第 {Math.min(round + 1, TOTAL_ROUNDS)} / {TOTAL_ROUNDS} 轮
         </Text>
-        {lastResult && (
-          <Text style={[styles.resultText, { color: lastResult.isFault ? '#E5484D' : '#30A46C' }]}>
-            {lastResult.isFault ? '失误！' : `${lastResult.timeMs} ms`}
-          </Text>
-        )}
+        <Text style={[styles.resultText, { color: lastResult ? (lastResult.isFault ? '#E5484D' : '#30A46C') : 'transparent' }]}>
+          {lastResult ? (lastResult.isFault ? '失误！' : `${lastResult.timeMs} ms`) : '成绩'}
+        </Text>
       </View>
 
       {/* 信号区（原生，触摸计时 + 点击继续） */}

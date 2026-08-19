@@ -22,8 +22,6 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 /**
@@ -46,6 +44,18 @@ object SmsNativeEngine {
   private var ringtoneSession: MediaSession? = null
   private var ringtoneVolumeProvider: VolumeProvider? = null
   private var ringtoneStopRunnable: Runnable? = null
+
+  // 复用 TTS 引擎（服务启动时主线程预初始化，避免锁屏 onInit 死锁；播报异步不阻塞）
+  @Volatile
+  private var ttsEngine: TtsEngine? = null
+
+  /** 预初始化 TTS 引擎（须主线程调用；onInit 需主线程空闲完成） */
+  fun initTts(context: Context) {
+    if (ttsEngine == null && Looper.myLooper() == Looper.getMainLooper()) {
+      ttsEngine = TtsEngine(context)
+      Log.d(TAG, "TTS 引擎预初始化已发起")
+    }
+  }
 
   /** JS 同步规则快照（JSON 数组，与 RuleEngine 数据结构一致） */
   fun setRules(rulesJson: String?) {
@@ -332,27 +342,21 @@ object SmsNativeEngine {
     }
   }
 
-  /** 锁屏语音播报：TtsEngine 播完即止 */
+  /**
+   * 锁屏语音播报（异步，不阻塞主线程）：
+   * 使用预初始化的复用引擎（initTts），播报异步进行，失败记录日志不兜底。
+   * 引擎未就绪（服务刚启动 1-2 秒内收到短信）时本次跳过。
+   */
   private fun speakViaTts(context: Context, text: String, rate: Float, pitch: Float, volume: Float): Boolean {
-    val engine = TtsEngine(context)
-    if (!engine.isReady()) {
-      Log.e(TAG, "语音播报失败：系统 TTS 引擎不可用")
-      engine.shutdown()
+    val engine = ttsEngine
+    if (engine == null || !engine.isReady()) {
+      Log.e(TAG, "语音播报跳过：TTS 引擎未就绪（预初始化后重试）")
       return false
     }
-    val latch = CountDownLatch(1)
-    val result = booleanArrayOf(false)
     engine.speak(text, rate, pitch, volume / 100.0f) { ok ->
-      result[0] = ok
-      latch.countDown()
+      Log.d(TAG, if (ok) "锁屏语音播报完成" else "锁屏语音播报失败")
     }
-    try {
-      latch.await(15, TimeUnit.SECONDS) // 播报最长等 15 秒，防卡死
-    } catch (e: InterruptedException) {
-      Thread.currentThread().interrupt()
-    }
-    engine.shutdown()
-    return result[0]
+    return true
   }
 
   /** 激活 MediaSession + VolumeProvider：系统把音量键路由为回调 → 停止铃声 */

@@ -63,6 +63,8 @@ class KeepAliveService : Service() {
   override fun onCreate() {
     super.onCreate()
     startForegroundCompat()
+    // 预初始化 TTS 引擎（主线程空闲完成 onInit，锁屏播报可直接用）
+    SmsNativeEngine.initTts(this)
     handler.post(pollTask)
     scheduleAlarm()
   }

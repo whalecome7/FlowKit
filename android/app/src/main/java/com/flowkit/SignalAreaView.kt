@@ -78,10 +78,10 @@ class SignalAreaView(context: Context) : View(context) {
     handler.postDelayed(readyRunnable, randomDelay())
   }
 
-  /** 停止/重置 */
+  /** 停止计时（每轮后复位定时器）。不重置 phase：保持 DONE/FAULT 显示（成绩/继续引导），
+   *  避免色块闪回初始灰态覆盖成绩文字；切模式由 setMode 重置 IDLE */
   fun stop() {
     handler.removeCallbacksAndMessages(null)
-    phase = Phase.IDLE
     invalidate()
   }
 

@@ -45,7 +45,8 @@ export default function ReactionGame() {
     setRound(next.length);
     setRunning(false);  // 复位，等待用户点色块继续
     if (next.length >= TOTAL_ROUNDS) {
-      navigation.navigate('ReactionResult', { mode, results: next });
+      // replace 替代游戏页：结果页返回/物理键直接回模式选择，栈不膨胀
+      navigation.replace('ReactionResult', { mode, results: next });
     }
   };
 

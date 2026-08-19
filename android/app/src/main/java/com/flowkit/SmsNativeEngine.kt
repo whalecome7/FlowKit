@@ -286,7 +286,8 @@ object SmsNativeEngine {
       if (speakText.isEmpty()) return false
       val rate = params.optDouble("rate", 1.0).toFloat()
       val pitch = params.optDouble("pitch", 1.0).toFloat()
-      return speakViaTts(context, speakText, rate, pitch)
+      val volume = params.optDouble("volume", 0.0).toFloat() // 0-100，0=当前音量
+      return speakViaTts(context, speakText, rate, pitch, volume)
     }
     // 铃声（默认/文件）：原逻辑不变
     val url = params.optString("url", "")
@@ -332,7 +333,7 @@ object SmsNativeEngine {
   }
 
   /** 锁屏语音播报：TtsEngine 播完即止 */
-  private fun speakViaTts(context: Context, text: String, rate: Float, pitch: Float): Boolean {
+  private fun speakViaTts(context: Context, text: String, rate: Float, pitch: Float, volume: Float): Boolean {
     val engine = TtsEngine(context)
     if (!engine.isReady()) {
       Log.e(TAG, "语音播报失败：系统 TTS 引擎不可用")
@@ -341,7 +342,7 @@ object SmsNativeEngine {
     }
     val latch = CountDownLatch(1)
     val result = booleanArrayOf(false)
-    engine.speak(text, rate, pitch) { ok ->
+    engine.speak(text, rate, pitch, volume / 100.0f) { ok ->
       result[0] = ok
       latch.countDown()
     }

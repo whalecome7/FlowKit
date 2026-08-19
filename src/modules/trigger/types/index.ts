@@ -142,8 +142,8 @@ export const ACTION_META: ActionMeta[] = [
       },
       {
         key: 'speakText',
-        label: '播报文字（可选）',
-        placeholder: '输入文字将语音播报，留空则播铃声',
+        label: '播报文字',
+        placeholder: '如：检测到违停短信',
         showWhen: { key: 'source', value: 'speech' },
       },
       {
@@ -156,6 +156,19 @@ export const ACTION_META: ActionMeta[] = [
           { label: '慢', value: '0.7' },
           { label: '正常', value: '1.0' },
           { label: '快', value: '1.5' },
+        ],
+      },
+      {
+        key: 'volume',
+        label: '播报音量',
+        numeric: true,
+        showWhen: { key: 'source', value: 'speech' },
+        placeholder: '音量 1-100，默认跟随系统',
+        presets: [
+          { label: '轻柔', value: '40' },
+          { label: '标准', value: '70' },
+          { label: '响亮', value: '100' },
+          { label: '跟随系统', value: 'custom' },
         ],
       },
       {

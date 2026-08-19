@@ -90,8 +90,13 @@ export const ActionExecutor = {
         }
         const rate = typeof params.rate === 'number' ? params.rate : 1.0;
         const pitch = typeof params.pitch === 'number' ? params.pitch : 1.0;
+        // 播报音量 1-100；custom/空 = 跟随系统音量（传 0）
+        const volume =
+          typeof params.volume === 'number' && params.volume > 0
+            ? Math.min(100, Math.max(1, params.volume))
+            : 0;
         try {
-          await nativeTts.speak(speakText, rate, pitch);
+          await nativeTts.speak(speakText, rate, pitch, volume);
           return { success: true };
         } catch (err) {
           return {

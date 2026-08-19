@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -101,6 +101,63 @@ export default function RuleEditScreen() {
   const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
   const [timeInput, setTimeInput] = useState('');
 
+  // A+B 方案：未保存修改检测（isDirty）+ 返回拦截 + header 提示
+  const savedRef = useRef(false);
+  const initial = useMemo(() => {
+    const t = template && !existingRule ? template : undefined;
+    return {
+      name: existingRule?.name ?? t?.name ?? '',
+      conditions: existingRule?.conditions ?? t?.conditions ?? [],
+      actions: existingRule?.actions ?? t?.actions ?? [],
+      whitelist: existingRule?.senderWhitelist ?? [],
+      blacklist: existingRule?.senderBlacklist ?? [],
+      twEnabled: existingRule?.timeWindow?.enabled ?? true,
+      twStart: existingRule?.timeWindow?.start ?? '08:00',
+      twEnd: existingRule?.timeWindow?.end ?? '22:00',
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingRule, template]);
+
+  const isDirty = useMemo(
+    () =>
+      name !== initial.name ||
+      JSON.stringify(conditions) !== JSON.stringify(initial.conditions) ||
+      JSON.stringify(actions) !== JSON.stringify(initial.actions) ||
+      JSON.stringify(senderWhitelist) !== JSON.stringify(initial.whitelist) ||
+      JSON.stringify(senderBlacklist) !== JSON.stringify(initial.blacklist) ||
+      timeWindowEnabled !== initial.twEnabled ||
+      timeWindowStart !== initial.twStart ||
+      timeWindowEnd !== initial.twEnd,
+    [
+      name, conditions, actions, senderWhitelist, senderBlacklist,
+      timeWindowEnabled, timeWindowStart, timeWindowEnd, initial,
+    ],
+  );
+
+  // B：header 显示「未保存」提示
+  useEffect(() => {
+    navigation.setOptions({
+      title: isDirty ? '● 编辑规则（未保存）' : '编辑规则',
+    });
+  }, [navigation, isDirty]);
+
+  // A：返回拦截确认（有未保存修改时）
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!isDirty || savedRef.current) return;
+      e.preventDefault();
+      Alert.alert('有未保存的修改', '确定放弃修改并退出吗？', [
+        { text: '继续编辑', style: 'cancel' },
+        {
+          text: '放弃修改',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(e.data.action),
+        },
+      ]);
+    });
+    return unsubscribe;
+  }, [navigation, isDirty]);
+
   const openConditionModal = (index: number) => {
     setDraftCondition({ ...conditions[index] });
     setEditing({ kind: 'condition', index });
@@ -178,6 +235,7 @@ export default function RuleEditScreen() {
     }
 
     try {
+      savedRef.current = true; // 保存成功标记：返回不再拦截
       if (isEditing && existingRule) {
         await updateRule(existingRule.id, {
           name: name.trim(),

@@ -25,14 +25,15 @@ class TtsModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun speak(text: String, rate: Double, pitch: Double, promise: Promise) {
+  fun speak(text: String, rate: Double, pitch: Double, volume: Double, promise: Promise) {
     val e = engine
     if (e == null || !e.isReady()) {
       promise.reject("TTS_UNAVAILABLE", "语音引擎不可用，请在系统设置 → 无障碍 → 文字转语音输出 中选择可用引擎")
       return
     }
     try {
-      e.speak(text, rate.toFloat(), pitch.toFloat()) { ok ->
+      // volume 0-100 → 0-1；<=0 表示用当前音量
+      e.speak(text, rate.toFloat(), pitch.toFloat(), (volume / 100.0).toFloat()) { ok ->
         // TTS 回调在系统线程，Promise 需主线程
         Handler(Looper.getMainLooper()).post {
           if (ok) promise.resolve(true)

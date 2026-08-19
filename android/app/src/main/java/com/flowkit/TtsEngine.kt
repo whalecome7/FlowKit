@@ -40,6 +40,9 @@ class TtsEngine(context: Context) {
   private var mediaSession: MediaSession? = null
   private var volumeProvider: VolumeProvider? = null
 
+  // 独立播报音量：调整前的闹钟流原音量（-1 = 未调整）
+  private var activeOriginalVolume = -1
+
   init {
     tts = TextToSpeech(
       appContext,
@@ -63,7 +66,12 @@ class TtsEngine(context: Context) {
    * 播报文字（播完即止）。
    * @param onDone 播完 true / 失败 false / 音量键停止 true（视为正常完成）
    */
-  fun speak(text: String, rate: Float, pitch: Float, onDone: (Boolean) -> Unit) {
+  /**
+   * 播报文字（播完即止）。
+   * @param volume 播报音量 0.0~1.0（临时调整闹钟流音量，播完恢复；<=0 表示不调整用当前音量）
+   * @param onDone 播完 true / 失败 false / 音量键停止 true（视为正常完成）
+   */
+  fun speak(text: String, rate: Float, pitch: Float, volume: Float, onDone: (Boolean) -> Unit) {
     val engine = tts
     if (engine == null || !ready) {
       Log.e(TAG, "speak 失败：引擎未就绪")
@@ -78,12 +86,15 @@ class TtsEngine(context: Context) {
     )
     engine.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
     engine.setPitch(pitch.coerceIn(0.5f, 2.0f))
+    // 独立音量：临时调整闹钟流音量（播完恢复原值）
+    applyAlarmVolume(volume)
     pendingCallback = onDone
     engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
       override fun onStart(utteranceId: String?) {}
 
       override fun onDone(utteranceId: String?) {
         Log.d(TAG, "speak done")
+        restoreAlarmVolume()
         deactivateVolumeStop()
         val cb = pendingCallback
         pendingCallback = null
@@ -92,6 +103,7 @@ class TtsEngine(context: Context) {
 
       override fun onError(utteranceId: String?) {
         Log.e(TAG, "speak onError")
+        restoreAlarmVolume()
         deactivateVolumeStop()
         val cb = pendingCallback
         pendingCallback = null
@@ -101,6 +113,7 @@ class TtsEngine(context: Context) {
       @Deprecated("Deprecated in Java")
       override fun onError(utteranceId: String?, errorCode: Int) {
         Log.e(TAG, "speak onError code=$errorCode")
+        restoreAlarmVolume()
         deactivateVolumeStop()
         val cb = pendingCallback
         pendingCallback = null
@@ -112,11 +125,32 @@ class TtsEngine(context: Context) {
     val result = engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
     if (result == TextToSpeech.ERROR) {
       Log.e(TAG, "speak 被拒绝")
+      restoreAlarmVolume()
       deactivateVolumeStop()
       val cb = pendingCallback
       pendingCallback = null
       cb?.invoke(false)
     }
+  }
+
+  /** 临时调整闹钟流音量（独立播报音量），记录原音量；volume<=0 不调整 */
+  private fun applyAlarmVolume(volume: Float) {
+    if (volume <= 0f) return
+    val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+    val stream = AudioManager.STREAM_ALARM
+    val max = audioManager.getStreamMaxVolume(stream)
+    if (max <= 0) return
+    activeOriginalVolume = audioManager.getStreamVolume(stream)
+    val target = Math.round(max * volume.coerceIn(0f, 1f))
+    audioManager.setStreamVolume(stream, target, 0)
+  }
+
+  /** 恢复原闹钟音量（未调整时不操作） */
+  private fun restoreAlarmVolume() {
+    if (activeOriginalVolume < 0) return
+    val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, activeOriginalVolume, 0)
+    activeOriginalVolume = -1
   }
 
   /** 激活 MediaSession + VolumeProvider：系统把音量键路由为回调 → 停止播报 */
@@ -160,6 +194,7 @@ class TtsEngine(context: Context) {
   /** 音量键触发：停止播报，视为正常完成（与铃声停止语义一致） */
   private fun stopByVolumeKey() {
     Log.d(TAG, "音量键停止播报")
+    restoreAlarmVolume()
     tts?.stop()
     deactivateVolumeStop()
     val cb = pendingCallback
@@ -174,6 +209,7 @@ class TtsEngine(context: Context) {
 
   /** 释放资源 */
   fun shutdown() {
+    restoreAlarmVolume()
     deactivateVolumeStop()
     tts?.shutdown()
     tts = null

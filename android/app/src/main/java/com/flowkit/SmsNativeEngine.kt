@@ -22,6 +22,8 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 /**
@@ -278,7 +280,15 @@ object SmsNativeEngine {
 
   private fun executeRingtone(context: Context, params: JSONObject): Boolean {
     val source = params.optString("source", "default")
-    // 文字播报在部分 ROM 受限，原生兜底仅支持铃声；speech 且无可用 TTS 时播默认铃声
+    // 语音播报：系统默认 TTS，播完即止，失败不兜底（不降级响铃）
+    if (source == "speech") {
+      val speakText = params.optString("speakText", "").trim()
+      if (speakText.isEmpty()) return false
+      val rate = params.optDouble("rate", 1.0).toFloat()
+      val pitch = params.optDouble("pitch", 1.0).toFloat()
+      return speakViaTts(context, speakText, rate, pitch)
+    }
+    // 铃声（默认/文件）：原逻辑不变
     val url = params.optString("url", "")
     val durationMs = params.optInt("duration", 0).takeIf { it > 0 } ?: 5000
 
@@ -319,6 +329,29 @@ object SmsNativeEngine {
       stopRingtone()
       return false
     }
+  }
+
+  /** 锁屏语音播报：TtsEngine 播完即止 */
+  private fun speakViaTts(context: Context, text: String, rate: Float, pitch: Float): Boolean {
+    val engine = TtsEngine(context)
+    if (!engine.isReady()) {
+      Log.e(TAG, "语音播报失败：系统 TTS 引擎不可用")
+      engine.shutdown()
+      return false
+    }
+    val latch = CountDownLatch(1)
+    val result = booleanArrayOf(false)
+    engine.speak(text, rate, pitch) { ok ->
+      result[0] = ok
+      latch.countDown()
+    }
+    try {
+      latch.await(15, TimeUnit.SECONDS) // 播报最长等 15 秒，防卡死
+    } catch (e: InterruptedException) {
+      Thread.currentThread().interrupt()
+    }
+    engine.shutdown()
+    return result[0]
   }
 
   /** 激活 MediaSession + VolumeProvider：系统把音量键路由为回调 → 停止铃声 */

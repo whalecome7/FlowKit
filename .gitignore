@@ -79,6 +79,15 @@ yarn-error.log
 .codebuddy
 .mcp.json
 
+# CodeGraph 本地索引数据库
+.codegraph/
+
+# 构建产物 / 补丁残留兜底
+*.apk
+*.tsbuildinfo
+*.rej
+*.orig
+
 # WorkBuddy local data
 .workbuddy/
 android/app/flowkit-release.keystore

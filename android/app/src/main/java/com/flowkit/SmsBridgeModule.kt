@@ -54,21 +54,6 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
-  @ReactMethod
-  fun getPendingSms(callback: Callback) {
-    val sms = pendingSms
-    if (sms != null) {
-      callback.invoke(
-        Arguments.createMap().apply {
-          putString("sender", sms.first)
-          putString("body", sms.second)
-        }
-      )
-    } else {
-      callback.invoke()
-    }
-  }
-
   private fun sendEvent(sender: String, body: String) {
     reactContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
@@ -178,9 +163,6 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     const val NAME = "SmsBridge"
     const val EVENT_NAME = "onSmsReceived"
 
-    @Volatile
-    private var pendingSms: Pair<String, String>? = null
-
     private var instance: SmsBridgeModule? = null
 
     private var lastSmsId: Long = -1
@@ -221,15 +203,13 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       }
     }
 
-    /** 由 SmsReceiver 调用：App 在前台直接发事件，否则缓存待 JS 补发 */
+    /** 由 checkNewSms 调用：直接发事件给 JS（App 未启动时事件丢失，由原生闭环兜底） */
     fun emitSms(sender: String, body: String) {
-      pendingSms = sender to body
       instance?.sendEvent(sender, body)
     }
 
     /** 原生已执行动作：事件携带命中信息，JS 仅记录日志 */
     private fun emitSmsWithLog(sender: String, body: String, match: SmsNativeEngine.NativeMatch) {
-      pendingSms = sender to body
       instance?.sendEventWithLog(sender, body, match)
     }
   }

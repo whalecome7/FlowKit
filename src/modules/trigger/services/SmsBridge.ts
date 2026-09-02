@@ -12,7 +12,7 @@ export interface NativeHandledInfo {
 }
 
 /**
- * 初始化短信桥接：注册事件监听 + 竞态补发 + 启动保活服务。
+ * 初始化短信桥接：注册事件监听 + 启动保活服务。
  * 在模块注册时调用一次。
  * 注意：原生模块通过 DeviceEventEmitterModule 发事件，JS 侧必须用
  * 全局 DeviceEventEmitter 监听（经典 NativeModule 无 addListener，
@@ -42,15 +42,6 @@ export function initSmsBridge(): void {
       void useTriggerStore
         .getState()
         .processSms(event.sender, event.body, nativeInfo);
-    },
-  );
-
-  // 启动竞态补发：App 被杀期间到达的短信
-  SmsBridge.getPendingSms?.(
-    (pending: { sender: string; body: string } | null) => {
-      if (pending) {
-        void useTriggerStore.getState().processSms(pending.sender, pending.body);
-      }
     },
   );
 

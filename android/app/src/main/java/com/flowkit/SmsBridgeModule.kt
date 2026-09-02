@@ -149,10 +149,11 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       (reactApplicationContext.getSystemService(Context.POWER_SERVICE) as? PowerManager)
         ?.isIgnoringBatteryOptimizations(reactApplicationContext.packageName) == true
     )
-    // 保活通知渠道是否被禁用（IMPORTANCE_NONE = 用户/ROM 关闭；渠道未创建时视为正常）
+    // 保活通知渠道可用性（低于 LOW 会被收纳/静默：NONE=禁用，MIN=MIUI 收纳无状态栏图标；渠道未创建视为正常）
     val nm = reactApplicationContext.getSystemService(NotificationManager::class.java)
     val channelEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      nm.getNotificationChannel("flowkit-keepalive-v2")?.importance != NotificationManager.IMPORTANCE_NONE
+      (nm.getNotificationChannel("flowkit-keepalive-v2")?.importance
+        ?: NotificationManager.IMPORTANCE_LOW) >= NotificationManager.IMPORTANCE_LOW
     } else {
       true
     }

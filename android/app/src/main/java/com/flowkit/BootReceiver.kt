@@ -13,10 +13,14 @@ class BootReceiver : BroadcastReceiver() {
     if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) return
 
     val service = Intent(context, KeepAliveService::class.java)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      context.startForegroundService(service)
-    } else {
-      context.startService(service)
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(service)
+      } else {
+        context.startService(service)
+      }
+    } catch (e: Exception) {
+      android.util.Log.e("BootReceiver", "拉起保活服务失败: ${e.message}")
     }
   }
 }

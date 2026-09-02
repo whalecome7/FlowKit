@@ -19,7 +19,6 @@ class KeepAliveService : Service() {
 
   private val handler = Handler(Looper.getMainLooper())
   private val pollIntervalMs = 10_000L
-  private val alarmIntervalMs = 30_000L
 
   /** 每 10 秒检查一次短信库（id 去重，广播正常时不会重复触发） */
   private val pollTask = object : Runnable {
@@ -37,45 +36,28 @@ class KeepAliveService : Service() {
     }
   }
 
-  /** 注册 AlarmManager 精确唤醒（充电/活跃时 30 秒一次，防服务被杀后失联） */
-  private fun scheduleAlarm() {
-    val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-    val intent = Intent(this, KeepAliveAlarmReceiver::class.java)
-    val pendingIntent = PendingIntent.getBroadcast(
-      this, 0, intent,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-    try {
-      alarmManager.setExactAndAllowWhileIdle(
-        AlarmManager.RTC_WAKEUP,
-        System.currentTimeMillis() + alarmIntervalMs,
-        pendingIntent
-      )
-    } catch (e: Exception) {
-      // 某些 ROM 限制高频精确闹钟，降级为 set
-      try {
-        alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + alarmIntervalMs, pendingIntent)
-      } catch (e2: Exception) {
-      }
-    }
-  }
-
   override fun onCreate() {
     super.onCreate()
     startForegroundCompat()
     // 预初始化 TTS 引擎（主线程空闲完成 onInit，锁屏播报可直接用）
     SmsNativeEngine.initTts(this)
     handler.post(pollTask)
-    scheduleAlarm()
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     startForegroundCompat()
+    // 每次被 start 都续期闹钟：闹钟 fire 拉起服务 → 此处再注册下一次，自续循环
+    scheduleNextAlarm(this)
     return START_STICKY // 被系统回收后尝试重建
   }
 
   override fun onDestroy() {
     handler.removeCallbacks(pollTask)
+    // 记录销毁时间（诊断页定位被杀时机）；不取消闹钟，等它 fire 把服务拉回
+    getSharedPreferences("flowkit_diag", Context.MODE_PRIVATE)
+      .edit()
+      .putLong("service_dead_ts", System.currentTimeMillis())
+      .apply()
     super.onDestroy()
   }
 
@@ -119,6 +101,33 @@ class KeepAliveService : Service() {
       startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
     } else {
       startForeground(1, notification)
+    }
+  }
+
+  companion object {
+    const val ALARM_INTERVAL_MS = 30_000L
+
+    /** 注册下一次保活闹钟（onStartCommand 与闹钟接收器共用，形成自续循环） */
+    fun scheduleNextAlarm(context: Context) {
+      val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+      val intent = Intent(context, KeepAliveAlarmReceiver::class.java)
+      val pendingIntent = PendingIntent.getBroadcast(
+        context, 0, intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+      val triggerAt = System.currentTimeMillis() + ALARM_INTERVAL_MS
+      try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+          // 未授权精确闹钟：降级 AllowWhileIdle（Doze 下有分钟级延迟，但链不断）
+          alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        } else {
+          alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        }
+      } catch (e: SecurityException) {
+        // 个别 ROM 权限判断不标准，兜底降级
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+      } catch (_: Exception) {
+      }
     }
   }
 }

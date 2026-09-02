@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.app.AlarmManager
 import android.app.NotificationManager
 import android.os.Build
 import android.provider.Settings
@@ -131,6 +132,12 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     val map = Arguments.createMap()
     map.putDouble("heartbeatTs", heartbeatTs.toDouble())
     map.putInt("rulesSynced", SmsNativeEngine.rulesCount())
+    // 精确闹钟授权（API 31+ 决定 Doze 下唤醒精度；低版本无此限制视为已授权）
+    val alarmManager = reactApplicationContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+    val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager?.canScheduleExactAlarms() == true
+    map.putBoolean("canExactAlarms", canExact)
+    // 上次服务销毁时间（定位被杀时机）
+    map.putDouble("serviceDeadTs", prefs.getLong("service_dead_ts", -1L).toDouble())
     val perms = Arguments.createMap()
     perms.putBoolean(
       "receiveSms",
@@ -177,6 +184,20 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       reactApplicationContext.startActivity(intent)
     } catch (e: Exception) {
       Log.e("SmsBridge", "跳转通知设置失败: ${e.message}")
+    }
+  }
+
+  /** 跳转精确闹钟授权页（API 31+） */
+  @ReactMethod
+  fun openExactAlarmSettings() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+      .setData(Uri.parse("package:${reactApplicationContext.packageName}"))
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+      reactApplicationContext.startActivity(intent)
+    } catch (e: Exception) {
+      Log.e("SmsBridge", "跳转精确闹钟设置失败: ${e.message}")
     }
   }
 

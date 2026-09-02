@@ -8,6 +8,8 @@ const { SmsBridge } = NativeModules;
 interface Diagnostics {
   heartbeatTs: number;
   rulesSynced: number;
+  canExactAlarms: boolean;
+  serviceDeadTs: number;
   perms: {
     receiveSms: boolean;
     readSms: boolean;
@@ -59,6 +61,23 @@ export default function DiagnosticsScreen() {
           </Text>
         </View>
         <Text style={[styles.hint, { color: colors.textSecondary }]}>上次心跳：{heartbeatText} · 轮询检测中</Text>
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>精确闹钟（Doze 唤醒）</Text>
+          <Text style={{ color: diag?.canExactAlarms ? '#22b573' : '#ff6b6b' }}>
+            {diag?.canExactAlarms ? '✓ 已授权' : '✗ 未授权'}
+          </Text>
+        </View>
+        {!diag?.canExactAlarms && (
+          <TouchableOpacity onPress={() => SmsBridge?.openExactAlarmSettings?.()} style={{ marginTop: 6 }}>
+            <Text style={{ color: '#4f9eff', fontSize: 12 }}>去授权精确闹钟 →</Text>
+          </TouchableOpacity>
+        )}
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>上次服务销毁</Text>
+          <Text style={{ color: colors.textSecondary }}>
+            {diag && diag.serviceDeadTs > 0 ? new Date(diag.serviceDeadTs).toLocaleString() : '无记录'}
+          </Text>
+        </View>
       </View>
 
       {/* 权限状态 */}

@@ -5,9 +5,6 @@
 # Superpowers brainstorm artifacts
 .superpowers/
 
-# CodeBuddy local settings
-.codebuddy/settings.local.json
-
 # Xcode
 #
 build/
@@ -30,7 +27,6 @@ DerivedData
 
 # Android/IntelliJ
 #
-build/
 .idea
 .gradle
 local.properties
@@ -82,7 +78,6 @@ yarn-error.log
 .claude
 .codebuddy
 .mcp.json
-.superpowers
 
 # WorkBuddy local data
 .workbuddy/

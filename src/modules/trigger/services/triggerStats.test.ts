@@ -46,8 +46,10 @@ describe('computeStats', () => {
   });
 
   it('近7天分布键齐全且计数正确', () => {
+    // 锚定到本地今天正午，不受测试运行时刻影响
+    const noon = new Date(now).setHours(12, 0, 0, 0);
     const logs = [
-      makeLog(0.5 * day, 'A', []), // 今天
+      makeLog(now - noon, 'A', []), // 今天正午
       makeLog(2 * day, 'B', []), // 2 天前
       makeLog(8 * day, 'C', []), // 8 天前（不在此列）
     ];

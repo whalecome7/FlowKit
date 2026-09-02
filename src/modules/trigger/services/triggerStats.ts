@@ -34,10 +34,8 @@ export function computeStats(logs: ExecutionLog[], now: number = Date.now()): St
   }
   const successRate = actionTotal === 0 ? 1 : actionOk / actionTotal;
 
-  // 近 7 天分布（今天为 daily[0]）
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const startTs = startOfToday.getTime();
+  // 近 7 天分布（今天为 daily[0]；按本地自然日聚合）
+  const startTs = new Date(now).setHours(0, 0, 0, 0);
   const daily = DAILY_KEYS.map((key, i) => {
     const dayStart = startTs - i * 24 * 3600 * 1000;
     const dayEnd = dayStart + 24 * 3600 * 1000;

@@ -13,6 +13,7 @@ interface Diagnostics {
     readSms: boolean;
     notifications: boolean;
     batteryExempt: boolean;
+    keepaliveChannel: boolean;
   };
 }
 
@@ -42,6 +43,7 @@ export default function DiagnosticsScreen() {
     { key: 'readSms', label: '读取短信', ok: !!diag?.perms.readSms },
     { key: 'notifications', label: '通知', ok: !!diag?.perms.notifications },
     { key: 'batteryExempt', label: '电池无限制', ok: !!diag?.perms.batteryExempt },
+    { key: 'keepaliveChannel', label: '保活通知', ok: !!diag?.perms.keepaliveChannel },
   ];
 
   const latest = logs[logs.length - 1];
@@ -70,6 +72,11 @@ export default function DiagnosticsScreen() {
             </View>
           ))}
         </View>
+        {!diag?.perms.keepaliveChannel && (
+          <TouchableOpacity onPress={() => SmsBridge?.openNotificationSettings?.()} style={{ marginTop: 8 }}>
+            <Text style={{ color: '#ff6b6b', fontSize: 12 }}>⚠ 保活通知被关闭，点击去开启 →</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => Linking.openSettings()} style={{ marginTop: 8 }}>
           <Text style={{ color: '#4f9eff', fontSize: 12 }}>去系统设置 →</Text>
         </TouchableOpacity>

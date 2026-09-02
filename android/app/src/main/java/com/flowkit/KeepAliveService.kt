@@ -82,12 +82,15 @@ class KeepAliveService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   private fun startForegroundCompat() {
-    val channelId = "flowkit-keepalive"
+    // 渠道重要性创建后不可修改：换新 id 升级 MIN→LOW（LOW 有状态栏图标，MIN 会被 MIUI 收纳）
+    val channelId = "flowkit-keepalive-v2"
     val nm = getSystemService(NotificationManager::class.java)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       nm.createNotificationChannel(
-        NotificationChannel(channelId, "FlowKit 保活", NotificationManager.IMPORTANCE_MIN)
+        NotificationChannel(channelId, "FlowKit 保活", NotificationManager.IMPORTANCE_LOW)
       )
+      // 删除废弃旧渠道，避免系统设置页出现两个「FlowKit 保活」
+      nm.deleteNotificationChannel("flowkit-keepalive")
     }
     val contentIntent = PendingIntent.getActivity(
       this, 0, Intent(this, MainActivity::class.java),

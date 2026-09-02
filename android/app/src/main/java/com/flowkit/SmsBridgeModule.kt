@@ -9,6 +9,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.app.NotificationManager
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import com.facebook.react.bridge.Arguments
@@ -147,8 +149,34 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       (reactApplicationContext.getSystemService(Context.POWER_SERVICE) as? PowerManager)
         ?.isIgnoringBatteryOptimizations(reactApplicationContext.packageName) == true
     )
+    // 保活通知渠道是否被禁用（IMPORTANCE_NONE = 用户/ROM 关闭；渠道未创建时视为正常）
+    val nm = reactApplicationContext.getSystemService(NotificationManager::class.java)
+    val channelEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      nm.getNotificationChannel("flowkit-keepalive-v2")?.importance != NotificationManager.IMPORTANCE_NONE
+    } else {
+      true
+    }
+    perms.putBoolean("keepaliveChannel", channelEnabled)
     map.putMap("perms", perms)
     callback.invoke(map)
+  }
+
+  /** 跳转系统应用通知设置页 */
+  @ReactMethod
+  fun openNotificationSettings() {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, reactApplicationContext.packageName)
+    } else {
+      Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        .setData(Uri.parse("package:${reactApplicationContext.packageName}"))
+    }
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+      reactApplicationContext.startActivity(intent)
+    } catch (e: Exception) {
+      Log.e("SmsBridge", "跳转通知设置失败: ${e.message}")
+    }
   }
 
   /** JS 同步规则快照（锁屏时原生闭环匹配用） */

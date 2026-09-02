@@ -110,8 +110,6 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       reactApplicationContext.contentResolver
         .registerContentObserver(Uri.parse("content://sms"), true, smsObserver)
       Log.d("SmsBridge", "短信数据库监听已注册")
-      // 启动时同步一次当前最新短信 id，避免误触发历史短信
-      checkNewSms(reactApplicationContext)
     } catch (e: Exception) {
       Log.e("SmsBridge", "注册短信监听失败: ${e.message}")
     }
@@ -167,6 +165,9 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
 
     private var lastSmsId: Long = -1
 
+    /** 首次同步标记：进程刚启动时只记录最新短信 id，不处理（防历史短信重放） */
+    private var initialized = false
+
     /** 检查短信库最新短信（供 ContentObserver 与保活服务轮询共用，跨线程安全） */
     @Synchronized
     fun checkNewSms(context: Context) {
@@ -182,6 +183,12 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
         cursor?.use { c ->
           if (c.moveToFirst()) {
             val id = c.getLong(0)
+            if (!initialized) {
+              // 首查仅同步 id：进程重启后收件箱最新一条是历史短信，不应重放
+              lastSmsId = id
+              initialized = true
+              return
+            }
             if (id != lastSmsId) {
               lastSmsId = id
               val sender = c.getString(1) ?: ""

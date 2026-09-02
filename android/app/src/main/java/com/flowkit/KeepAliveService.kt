@@ -54,10 +54,11 @@ class KeepAliveService : Service() {
   override fun onDestroy() {
     handler.removeCallbacks(pollTask)
     // 记录销毁时间（诊断页定位被杀时机）；不取消闹钟，等它 fire 把服务拉回
+    // commit 同步落盘：onDestroy 是最后写入窗口，apply 异步写可能随进程终止丢失
     getSharedPreferences("flowkit_diag", Context.MODE_PRIVATE)
       .edit()
       .putLong("service_dead_ts", System.currentTimeMillis())
-      .apply()
+      .commit()
     super.onDestroy()
   }
 
@@ -124,8 +125,11 @@ class KeepAliveService : Service() {
           alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         }
       } catch (e: SecurityException) {
-        // 个别 ROM 权限判断不标准，兜底降级
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        // 个别 ROM 权限判断不标准，兜底降级（再次失败只能放弃本次注册，等下个续期点）
+        try {
+          alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        } catch (_: Exception) {
+        }
       } catch (_: Exception) {
       }
     }

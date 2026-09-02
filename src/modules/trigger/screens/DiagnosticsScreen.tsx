@@ -75,7 +75,11 @@ export default function DiagnosticsScreen() {
         <View style={[styles.rowBetween, { marginTop: 10 }]}>
           <Text style={{ color: colors.text }}>上次服务销毁</Text>
           <Text style={{ color: colors.textSecondary }}>
-            {diag && diag.serviceDeadTs > 0 ? new Date(diag.serviceDeadTs).toLocaleString() : '无记录'}
+            {diag && diag.serviceDeadTs > 0
+              ? new Date(diag.serviceDeadTs).toLocaleString()
+              : serviceRunning
+                ? '无记录'
+                : '进程级被杀（无销毁记录）'}
           </Text>
         </View>
       </View>

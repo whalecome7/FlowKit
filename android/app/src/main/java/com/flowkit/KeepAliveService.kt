@@ -20,7 +20,7 @@ class KeepAliveService : Service() {
   private val handler = Handler(Looper.getMainLooper())
   private val pollIntervalMs = 10_000L
 
-  /** 每 10 秒检查一次短信库（id 去重，广播正常时不会重复触发） */
+  /** 每 10 秒检查一次短信库（id 去重，Observer/轮询/闹钟多入口只处理一次） */
   private val pollTask = object : Runnable {
     override fun run() {
       try {
@@ -124,13 +124,13 @@ class KeepAliveService : Service() {
         } else {
           alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         }
-      } catch (e: SecurityException) {
-        // 个别 ROM 权限判断不标准，兜底降级（再次失败只能放弃本次注册，等下个续期点）
+      } catch (e: Exception) {
+        // 兜底降级（SecurityException 或 ROM 限制高频精确闹钟等）；
+        // 服务存活期间无其他续期点，失败只能等用户打开 App 自愈
         try {
           alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         } catch (_: Exception) {
         }
-      } catch (_: Exception) {
       }
     }
   }

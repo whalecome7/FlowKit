@@ -77,9 +77,11 @@ export default function DiagnosticsScreen() {
           <Text style={{ color: colors.textSecondary }}>
             {diag && diag.serviceDeadTs > 0
               ? new Date(diag.serviceDeadTs).toLocaleString()
-              : serviceRunning
-                ? '无记录'
-                : '进程级被杀（无销毁记录）'}
+              : !diag || diag.heartbeatTs <= 0
+                ? '未启动'
+                : serviceRunning
+                  ? '无记录'
+                  : '进程级被杀（无销毁记录）'}
           </Text>
         </View>
       </View>

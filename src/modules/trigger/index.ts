@@ -18,9 +18,12 @@ const triggerModuleConfig: ModuleConfig = {
 export function registerTriggerModule(): void {
   ActionExecutor.registerDefaults();
   if (Platform.OS === 'android') {
-    initSmsBridge();
-    // 启动即加载规则（触发 loadRules 后的原生规则快照同步，供锁屏原生闭环匹配）
-    void useTriggerStore.getState().loadRules();
+    // 原生初始化（前台服务/短信监听）与规则加载放到当前渲染完成后，
+    // 避免占用启动关键路径导致首屏触摸无响应
+    setTimeout(() => {
+      initSmsBridge();
+      void useTriggerStore.getState().loadRules();
+    }, 0);
     notifee.onForegroundEvent(({ type }) => {
       if (type === EventType.PRESS) {
         navigateToLog();

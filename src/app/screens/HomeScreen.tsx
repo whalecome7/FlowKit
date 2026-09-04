@@ -126,7 +126,15 @@ export default function HomeScreen() {
             style={styles.card}
             activeOpacity={0.7}
             onPress={() => {
-              navigation.navigate(item.homeRoute as never);
+              // reset 重建栈为 [Home, 模块首页]：无论当前栈有何残留（多次返回、
+              // 热恢复、通知跳转遗留），入口行为都确定，返回路径也必然逐级正确
+              navigation.reset({
+                index: 1,
+                routes: [
+                  { name: 'Home' as never },
+                  { name: item.homeRoute as never },
+                ],
+              });
             }}>
             <Text style={styles.cardTitle}>{item.name}</Text>
           </TouchableOpacity>

@@ -134,10 +134,12 @@ export default function RuleEditScreen() {
     ],
   );
 
-  // B：header 显示「未保存」提示
+  // B：header 显示「未保存」提示；脏页面同时禁用左滑手势，
+  // 避免原生手势 pop 动画与 beforeRemove 拦截竞争导致栈错乱
   useEffect(() => {
     navigation.setOptions({
       title: isDirty ? '● 编辑规则（未保存）' : '编辑规则',
+      gestureEnabled: !isDirty,
     });
   }, [navigation, isDirty]);
 

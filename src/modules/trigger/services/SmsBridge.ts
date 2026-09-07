@@ -11,6 +11,15 @@ export interface NativeHandledInfo {
   actionResults: { type: string; success: boolean }[];
 }
 
+/** 离线短信事件（RN 未启动期间原生入队，启动后补记） */
+interface PendingSmsEvent {
+  sender: string;
+  body: string;
+  nativeHandled?: boolean;
+  ruleName?: string;
+  actionResults?: { type: string; success: boolean }[];
+}
+
 /**
  * 初始化短信桥接：注册事件监听 + 启动保活服务。
  * 在模块注册时调用一次。
@@ -24,26 +33,43 @@ export function initSmsBridge(): void {
   // 延迟获取 store（避免 SmsBridge ↔ store 循环依赖初始化问题）
   const { useTriggerStore } = require('../store');
 
+  const toNativeInfo = (event: PendingSmsEvent): NativeHandledInfo | undefined =>
+    event.nativeHandled
+      ? {
+          ruleName: event.ruleName ?? '',
+          actionResults: event.actionResults ?? [],
+        }
+      : undefined;
+
   DeviceEventEmitter.addListener(
     'onSmsReceived',
-    (event: {
-      sender: string;
-      body: string;
-      nativeHandled?: boolean;
-      ruleName?: string;
-      actionResults?: { type: string; success: boolean }[];
-    }) => {
-      const nativeInfo: NativeHandledInfo | undefined = event.nativeHandled
-        ? {
-            ruleName: event.ruleName ?? '',
-            actionResults: event.actionResults ?? [],
-          }
-        : undefined;
+    (event: PendingSmsEvent) => {
       void useTriggerStore
         .getState()
-        .processSms(event.sender, event.body, nativeInfo);
+        .processSms(event.sender, event.body, toNativeInfo(event));
     },
   );
+
+  // 补记离线期间（进程被后台拉起、RN 未启动时）积压的短信事件
+  // （顺序 await：processSms 内部有读存合并，并发会互相覆盖）
+  try {
+    SmsBridge.takePendingSmsEvents?.((json: string) => {
+      try {
+        const events = JSON.parse(json || '[]') as PendingSmsEvent[];
+        void (async () => {
+          for (const event of events) {
+            await useTriggerStore
+              .getState()
+              .processSms(event.sender, event.body, toNativeInfo(event));
+          }
+        })();
+      } catch {
+        // 忽略补记失败（队列数据异常时放弃，不影响正常监听）
+      }
+    });
+  } catch {
+    // 原生未就绪时跳过（本次会话无离线积压可补）
+  }
 
   // 确保保活服务在跑
   SmsBridge.startService?.();

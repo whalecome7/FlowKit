@@ -10,6 +10,9 @@ interface Diagnostics {
   rulesSynced: number;
   canExactAlarms: boolean;
   serviceDeadTs: number;
+  lastSmsId: number;
+  pendingSmsCount: number;
+  rulesOnDisk: number;
   perms: {
     receiveSms: boolean;
     readSms: boolean;
@@ -84,6 +87,43 @@ export default function DiagnosticsScreen() {
                   : '进程级被杀（无销毁记录）'}
           </Text>
         </View>
+      </View>
+
+      {/* 短信捕获补漏：进程被杀期间的短信依赖持久化进度补处理 */}
+      <View style={[styles.card, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>短信捕获补漏</Text>
+        <View style={styles.rowBetween}>
+          <Text style={{ color: colors.text }}>处理进度</Text>
+          <Text style={{ color: diag && diag.lastSmsId > 0 ? '#22b573' : '#ffb020' }}>
+            {diag && diag.lastSmsId > 0 ? `✓ 已处理至短信 #${diag.lastSmsId}` : '⚠ 尚未初始化'}
+          </Text>
+        </View>
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>离线待补记</Text>
+          <Text style={{ color: diag && diag.pendingSmsCount > 0 ? '#ffb020' : '#22b573' }}>
+            {diag && diag.pendingSmsCount > 0
+              ? `⚠ ${diag.pendingSmsCount} 条（打开 App 自动补记）`
+              : '✓ 无积压'}
+          </Text>
+        </View>
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>磁盘规则快照</Text>
+          <Text
+            style={{
+              color:
+                diag && diag.rulesOnDisk >= 0 && diag.rulesOnDisk === diag.rulesSynced
+                  ? '#22b573'
+                  : '#ffb020',
+            }}
+          >
+            {diag
+              ? `磁盘 ${diag.rulesOnDisk >= 0 ? `${diag.rulesOnDisk} 条` : '无'} · 内存 ${diag.rulesSynced} 条`
+              : '—'}
+          </Text>
+        </View>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          💡 进程被系统杀死后，死亡窗口内的新短信会在 App 恢复执行的瞬间自动补触发并记录，不会丢失
+        </Text>
       </View>
 
       {/* 权限状态 */}

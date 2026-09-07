@@ -34,8 +34,18 @@ object SmsNativeEngine {
 
   private const val TAG = "SmsNative"
 
+  /** 诊断/持久化 prefs（与 KeepAliveService、SmsBridgeModule 共用） */
+  const val DIAG_PREFS = "flowkit_diag"
+
+  /** 规则快照落盘 key（JS setRules 时写入，进程后台拉起时恢复） */
+  const val RULES_KEY = "native_rules_json"
+
   @Volatile
   private var rules: List<NativeRule> = emptyList()
+
+  /** 规则快照是否已就绪（JS 同步或磁盘恢复，二者其一即可，避免重复 IO） */
+  @Volatile
+  private var rulesLoaded = false
 
   private val handler = Handler(Looper.getMainLooper())
 
@@ -59,11 +69,38 @@ object SmsNativeEngine {
 
   /** JS 同步规则快照（JSON 数组，与 RuleEngine 数据结构一致） */
   fun setRules(rulesJson: String?) {
+    rulesLoaded = true
     if (rulesJson.isNullOrBlank()) {
       rules = emptyList()
       return
     }
+    rules = parseRules(rulesJson)
+    Log.d(TAG, "规则快照已同步: ${rules.size} 条")
+  }
+
+  /**
+   * 从磁盘恢复规则快照（checkNewSms 懒加载调用）：
+   * 进程被保活闹钟后台拉起时 RN 不会启动、setRules 不会执行，
+   * 若不恢复快照，补处理窗口内的短信将因"无规则"而全部漏触发。
+   */
+  fun ensureRulesLoaded(context: Context) {
+    if (rulesLoaded) return
+    rulesLoaded = true
     try {
+      val json = context.getSharedPreferences(DIAG_PREFS, Context.MODE_PRIVATE)
+        .getString(RULES_KEY, null)
+      if (!json.isNullOrBlank()) {
+        rules = parseRules(json)
+        Log.d(TAG, "规则快照已从磁盘恢复: ${rules.size} 条")
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "规则快照恢复失败: ${e.message}")
+    }
+  }
+
+  /** 解析规则快照 JSON（JS syncRulesToNative 与磁盘恢复共用） */
+  private fun parseRules(rulesJson: String): List<NativeRule> {
+    return try {
       val arr = JSONArray(rulesJson)
       val list = mutableListOf<NativeRule>()
       for (i in 0 until arr.length()) {
@@ -120,15 +157,26 @@ object SmsNativeEngine {
           )
         }
       }
-      rules = list
-      Log.d(TAG, "规则快照已同步: ${list.size} 条")
+      list
     } catch (e: Exception) {
       Log.e(TAG, "规则快照解析失败: ${e.message}")
+      emptyList()
     }
   }
 
   /** 当前规则快照条数（自诊断页展示） */
   fun rulesCount(): Int = rules.size
+
+  /** 磁盘规则快照条数（自诊断页展示离线可用性；无快照返回 -1） */
+  fun diskRulesCount(context: Context): Int {
+    return try {
+      val json = context.getSharedPreferences(DIAG_PREFS, Context.MODE_PRIVATE)
+        .getString(RULES_KEY, null) ?: return -1
+      parseRules(json).size
+    } catch (e: Exception) {
+      -1
+    }
+  }
 
   private data class NativeCondition(
     val field: String,

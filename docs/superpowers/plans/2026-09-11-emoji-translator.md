@@ -1240,7 +1240,11 @@ export const useEmojiStore = create<EmojiState>((set, get) => ({
     if (!text || text.length > MAX_INPUT_LENGTH) return;
     const tokens = translate(text);
     set({ tokens, picksExact: [], picksEmoji: [] });
-    historyStorage.addHistory(text).then((history) => set({ history }));
+    // 注：快速连续生成存在低概率的 RMW 竞态（历史可能丢一条），一期接受
+    historyStorage
+      .addHistory(text)
+      .then((history) => set({ history }))
+      .catch(() => console.warn('emoji: 历史保存失败'));
   },
 
   cycleCandidate(tokenIndex) {
@@ -1263,11 +1267,19 @@ export const useEmojiStore = create<EmojiState>((set, get) => ({
   },
 
   async removeHistory(id) {
-    set({ history: await historyStorage.removeHistory(id) });
+    try {
+      set({ history: await historyStorage.removeHistory(id) });
+    } catch {
+      console.warn('emoji: 删除历史失败');
+    }
   },
 
   async clearHistory() {
-    await historyStorage.clearHistory();
+    try {
+      await historyStorage.clearHistory();
+    } catch {
+      console.warn('emoji: 清空历史失败');
+    }
     set({ history: [] });
   },
 

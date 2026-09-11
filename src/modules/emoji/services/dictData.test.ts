@@ -38,6 +38,10 @@ describe('音节表结构', () => {
     const withExact = entries.filter(([, e]) => e.exact.length > 0).length;
     expect(withExact / entries.length).toBeGreaterThanOrEqual(0.95);
   });
+
+  it('音节覆盖度：键数 ≥ 350', () => {
+    expect(Object.keys(syllables).length).toBeGreaterThanOrEqual(350);
+  });
 });
 
 describe('短语库结构', () => {

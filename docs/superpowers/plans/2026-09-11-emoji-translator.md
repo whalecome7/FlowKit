@@ -505,7 +505,9 @@ describe('splitGraphemes', () => {
   });
 
   it('ZWJ 序列不拆分', () => {
-    expect(splitGraphemes('👨👩🧓🧒')).toEqual(['👨👩🧓🧒']);
+    /* 用码点构造：emoji 字面量在文本传递中可能丢失 ZWJ U+200D */
+    const zwj = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
+    expect(splitGraphemes(zwj)).toEqual([zwj]);
   });
 
   it('变体选择符与肤色修饰符并入前一个字符', () => {
@@ -565,17 +567,17 @@ npx jest src/modules/emoji/services/translator.test.ts
 import syllablesData from '../data/syllables.json';
 import phrasesData from '../data/phrases.json';
 import { getSyllables } from './pinyin';
-import type { Token, RenderMode, SyllableEntry } from '../types';
+import type { Token, RenderMode, SyllableEntry, PhraseEntry } from '../types';
 
 /** 词库（可注入：生产用默认字典，测试用自定义小字典） */
 export interface Dictionary {
   syllables: Record<string, SyllableEntry>;
-  phrases: Record<string, string[]>;
+  phrases: Record<string, PhraseEntry>;
 }
 
 const defaultDict: Dictionary = {
   syllables: syllablesData as Record<string, SyllableEntry>,
-  phrases: phrasesData as Record<string, string[]>,
+  phrases: phrasesData as Record<string, PhraseEntry>,
 };
 
 const HANZI_RE = /^[\u4e00-\u9fff]$/;
@@ -810,13 +812,12 @@ node scripts/gen-syllables.js > /tmp/syllables.txt && head -8 /tmp/syllables.txt
 在 `dictData.test.ts` 的 `describe('音节表结构')` 内追加：
 
 ```ts
-  it('音节覆盖度：键数 ≥ 350 且精确候选非空占比 ≥ 95%', () => {
-    const keys = Object.keys(syllables);
-    expect(keys.length).toBeGreaterThanOrEqual(350);
-    const withExact = entries.filter(([, e]) => e.exact.length > 0).length;
-    expect(withExact / keys.length).toBeGreaterThanOrEqual(0.95);
+  it('音节覆盖度：键数 ≥ 350', () => {
+    expect(Object.keys(syllables).length).toBeGreaterThanOrEqual(350);
   });
 ```
+
+（说明：「精确候选非空占比 ≥ 95%」的断言已在 Task 2 审查修复中加入 `dictData.test.ts`，此处只补键数断言。）
 
 运行：
 

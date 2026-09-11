@@ -21,7 +21,9 @@ describe('getSyllables', () => {
   it('非汉字被移除，数组长度等于文本中汉字数', () => {
     expect(getSyllables('我爱，你！')).toEqual(['wo', 'ai', 'ni']);
     expect(getSyllables('2024年快乐')).toEqual(['nian', 'kuai', 'le']);
-    expect(getSyllables('床前明月光\n疑是地上霜')).toHaveLength(10);
+    expect(getSyllables('床前明月光\n疑是地上霜')).toEqual([
+      'chuang', 'qian', 'ming', 'yue', 'guang', 'yi', 'shi', 'di', 'shang', 'shuang',
+    ]);
     expect(getSyllables('hello')).toEqual([]);
     expect(getSyllables('')).toEqual([]);
   });

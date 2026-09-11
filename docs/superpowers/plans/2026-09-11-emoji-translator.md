@@ -454,6 +454,14 @@ describe('候选与降级', () => {
     expect(renderTokens(tokens, 'emoji')).toBe('❓');
   });
 
+  it('字库外汉字不导致后续字音节错位', () => {
+    // 「龥」(U+9FA5) 在基本区内但 pinyin-pro 不识别（实测基本区共 49 个此类字）；
+    // 若不防御，音节数组会与字符错位，导致「马」拿不到音节
+    const tokens = translate('龥马', testDict);
+    expect(tokens[0].candidates).toEqual([]); // 龥：无音节 → 无候选
+    expect(tokens[1].candidates[0]).toBe('🐴'); // 马：仍正确取到 ma
+  });
+
   it('标点/数字/英文原样保留（两版一致）', () => {
     const tokens = translate('马2go，', testDict);
     expect(renderTokens(tokens, 'exact')).toBe('🐴2go，');
@@ -635,6 +643,12 @@ export function translate(text: string, dict: Dictionary = defaultDict): Token[]
   const normalized = text.replace(/\r\n?/g, '\n');
   const graphemes = splitGraphemes(normalized);
   const syllablesList = getSyllables(normalized);
+
+  // 防御：pinyin-pro 字库外的极少数基本区汉字（实测 49 个，如「龥」U+9FA5）不返回音节，
+  // 会造成音节数组与汉字数不一致；不一致时改为逐字取音，避免后续字全部错位
+  const hanziCount = graphemes.reduce((n, g) => (HANZI_RE.test(g) ? n + 1 : n), 0);
+  const aligned = syllablesList.length === hanziCount;
+
   const maxPhraseLen = Object.keys(dict.phrases).reduce(
     (max, p) => Math.max(max, Array.from(p).length),
     0,
@@ -669,14 +683,18 @@ export function translate(text: string, dict: Dictionary = defaultDict): Token[]
 
     if (phraseHit) {
       for (let j = 0; j < phraseLen; j++) {
-        tokens.push(buildToken(graphemes[i + j], syllablesList[si + j], phraseHit[j], dict));
+        const syllable = aligned
+          ? syllablesList[si + j]
+          : getSyllables(graphemes[i + j])[0];
+        tokens.push(buildToken(graphemes[i + j], syllable, phraseHit[j], dict));
       }
       si += phraseLen;
       i += phraseLen;
       continue;
     }
 
-    tokens.push(buildToken(char, syllablesList[si], undefined, dict));
+    const syllable = aligned ? syllablesList[si] : getSyllables(char)[0];
+    tokens.push(buildToken(char, syllable, undefined, dict));
     si += 1;
     i += 1;
   }

@@ -963,8 +963,9 @@ git commit -m "feat: emoji 模块短语库扩充至 N 条"
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadHistory, addHistory, removeHistory, clearHistory } from './historyStorage';
 
+// async-storage v3 官方 mock 入口（v3 起旧路径 /jest/async-storage-mock 已移除）
 jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+  require('@react-native-async-storage/async-storage/jest'),
 );
 
 beforeEach(async () => {

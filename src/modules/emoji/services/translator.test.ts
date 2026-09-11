@@ -77,6 +77,13 @@ describe('候选与降级', () => {
     expect(displayChar(tokens[0], 'emoji', 2)).toBe('🤫');
   });
 
+  it('越界或非整数 pick 回落到默认渲染', () => {
+    const tokens = translate('马', testDict);
+    expect(displayChar(tokens[0], 'exact', -1)).toBe('🐴');
+    expect(displayChar(tokens[0], 'exact', 99)).toBe('🐴');
+    expect(displayChar(tokens[0], 'exact', 1.5)).toBe('🐴');
+  });
+
   it('similar 候选在纯 emoji 版参与默认渲染（无 exact 时）', () => {
     const dict: Dictionary = {
       syllables: { zhu: { exact: [], similar: [{ emoji: '🍚', label: '粥' }] } },
@@ -85,6 +92,37 @@ describe('候选与降级', () => {
     const tokens = translate('竹', dict);
     expect(renderTokens(tokens, 'exact')).toBe('竹');
     expect(renderTokens(tokens, 'emoji')).toBe('🍚');
+  });
+
+  it('空串与纯标点', () => {
+    expect(translate('', testDict)).toEqual([]);
+    const punct = translate('。，！', testDict);
+    expect(renderTokens(punct, 'exact')).toBe('。，！');
+    expect(renderTokens(punct, 'emoji')).toBe('。，！');
+  });
+
+  it('CRLF 换行归一化为 LF', () => {
+    const tokens = translate('马\r\n虎', testDict);
+    expect(tokens).toHaveLength(3);
+    expect(tokens[1].char).toBe('\n');
+  });
+
+  it('非对齐模式下短语仍正确命中', () => {
+    // 「龥」使音节数与汉字数失配，触发逐字回退；短语匹配不受影响
+    const tokens = translate('龥马虎', testDict);
+    expect(tokens[0].candidates).toEqual([]); // 龥：无候选
+    expect(tokens[1].candidates[0]).toBe('🐴'); // 马：短语编排
+    expect(tokens[2].candidates[0]).toBe('🐯'); // 虎：短语编排
+  });
+
+  it('similar 中的短语 emoji 会被去重', () => {
+    const dict: Dictionary = {
+      syllables: { xin: { exact: [], similar: [{ emoji: '💗', label: '心' }] } },
+      phrases: { 心心: ['💗', '💗'] },
+    };
+    const tokens = translate('心心', dict);
+    expect(tokens[0].candidates).toEqual(['💗']); // similar 中的 💗 被去重
+    expect(tokens[0].exactCount).toBe(1);
   });
 });
 
@@ -99,6 +137,21 @@ describe('nextPick 点按换候选', () => {
   it('无精确候选时：精确版从「原字」出发切到第一个候选', () => {
     const token = { char: '竹', type: 'hanzi' as const, candidates: ['🍚'], exactCount: 0 };
     expect(nextPick(token, 'exact', undefined)).toBe(0);
+  });
+
+  it('纯 emoji 模式下默认态切到下一个候选', () => {
+    const tokens = translate('马', testDict); // candidates = [🐴,👩,🤫]
+    expect(nextPick(tokens[0], 'emoji', undefined)).toBe(1);
+    expect(nextPick(tokens[0], 'emoji', 2)).toBe(0);
+  });
+
+  it('无候选与负数输入安全（不越界）', () => {
+    const empty = { char: 'x', type: 'hanzi' as const, candidates: [], exactCount: 0 };
+    expect(nextPick(empty, 'exact', undefined)).toBe(0);
+    const tokens = translate('马', testDict);
+    const neg = nextPick(tokens[0], 'exact', -2);
+    expect(neg).toBeGreaterThanOrEqual(0);
+    expect(neg).toBeLessThan(tokens[0].candidates.length);
   });
 });
 
@@ -116,6 +169,16 @@ describe('splitGraphemes', () => {
   it('变体选择符与肤色修饰符并入前一个字符', () => {
     expect(splitGraphemes('🤔️')).toEqual(['🤔️']);
     expect(splitGraphemes('🤘🏼')).toEqual(['🤘🏼']);
+  });
+
+  it('键帽、国旗（RI 对）、标签序列均合为一簇', () => {
+    expect(splitGraphemes('8\uFE0F\u20E3')).toEqual(['8\uFE0F\u20E3']);
+    const flag = String.fromCodePoint(0x1f1e8, 0x1f1f3); // CN 国旗
+    expect(splitGraphemes(flag)).toEqual([flag]);
+    const tagFlag = String.fromCodePoint(
+      0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f,
+    );
+    expect(splitGraphemes(tagFlag)).toEqual([tagFlag]);
   });
 });
 

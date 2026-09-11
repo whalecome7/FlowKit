@@ -22,7 +22,7 @@
 ```bash
 git clone <repo-url>
 cd FlowKit
-npm install
+yarn install
 ```
 
 ### 运行

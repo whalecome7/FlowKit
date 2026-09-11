@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,7 @@ export default function EmojiTranslatorScreen() {
     applyHistory,
   } = useEmojiStore();
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // 从历史页回填：有参数则直接生成并清掉参数（防重复触发）
   const routeText: string | undefined = route.params?.text;
@@ -51,8 +52,7 @@ export default function EmojiTranslatorScreen() {
       applyHistory(routeText);
       navigation.setParams({ text: undefined });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeText]);
+  }, [routeText, applyHistory, navigation]);
 
   const picks = mode === 'exact' ? picksExact : picksEmoji;
   const canGenerate = input.trim().length > 0;
@@ -69,10 +69,16 @@ export default function EmojiTranslatorScreen() {
 
   const onCopy = () => {
     if (tokens.length === 0) return;
+    clearTimeout(timerRef.current);
     Clipboard.setString(renderTokens(tokens, mode, picks));
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    timerRef.current = setTimeout(() => setCopied(false), 1500);
   };
+
+  // 卸载时清理未完成的复制提示定时器，避免对已卸载组件 setState
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
 
   return (
     <ScrollView

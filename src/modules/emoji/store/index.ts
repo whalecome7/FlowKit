@@ -7,9 +7,9 @@ import type { Token, RenderMode, HistoryItem } from '../types';
 interface EmojiState {
   input: string;
   tokens: Token[];
-  /** 精确版各字位的手动选择索引（与 tokens 等长；undefined = 默认） */
+  /** 精确版各字位的手动选择索引（按索引对应 tokens 字位；缺省/undefined = 默认） */
   picksExact: (number | undefined)[];
-  /** 纯 emoji 版各字位的手动选择索引 */
+  /** 纯 emoji 版各字位的手动选择索引（同上） */
   picksEmoji: (number | undefined)[];
   mode: RenderMode;
   history: HistoryItem[];
@@ -45,7 +45,7 @@ export const useEmojiStore = create<EmojiState>((set, get) => ({
     if (!text || text.length > MAX_INPUT_LENGTH) return;
     const tokens = translate(text);
     set({ tokens, picksExact: [], picksEmoji: [] });
-    // 注：快速连续生成存在低概率的 RMW 竞态（历史可能丢一条），一期接受
+    // 注：快速连续生成或与清空/删除交错时存在低概率竞态（历史可能丢一条/复活），一期接受
     historyStorage
       .addHistory(text)
       .then((history) => set({ history }))
@@ -83,6 +83,7 @@ export const useEmojiStore = create<EmojiState>((set, get) => ({
     try {
       await historyStorage.clearHistory();
     } catch {
+      // 乐观清空：存储清理失败也重置本地列表（「清空」意图优先，一期接受旧数据可能「复活」）
       console.warn('emoji: 清空历史失败');
     }
     set({ history: [] });

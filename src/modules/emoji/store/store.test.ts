@@ -1,4 +1,5 @@
 import { useEmojiStore } from './index';
+import * as historyStorage from '../services/historyStorage';
 
 jest.mock('../services/historyStorage', () => ({
   loadHistory: jest.fn().mockResolvedValue([]),
@@ -35,6 +36,7 @@ describe('useEmojiStore', () => {
   });
 
   it('cycleCandidate：精确版与纯 emoji 版选择相互独立', () => {
+    // 依赖生产数据：「马」有 2 个精确候选（🐴/👩），默认从第 0 个切到第 1 个
     useEmojiStore.getState().setInput('马');
     useEmojiStore.getState().generate();
     useEmojiStore.getState().cycleCandidate(0);
@@ -61,5 +63,32 @@ describe('useEmojiStore', () => {
     const s = useEmojiStore.getState();
     expect(s.input).toBe('七嘴八舌');
     expect(s.tokens).toHaveLength(4);
+  });
+
+  it('generate：重新生成会清空已有的手动选择', () => {
+    useEmojiStore.getState().setInput('马');
+    useEmojiStore.getState().generate();
+    useEmojiStore.getState().cycleCandidate(0);
+    expect(useEmojiStore.getState().picksExact[0]).toBe(1);
+
+    useEmojiStore.getState().setInput('七嘴八舌');
+    useEmojiStore.getState().generate();
+    expect(useEmojiStore.getState().picksExact).toEqual([]);
+    expect(useEmojiStore.getState().picksEmoji).toEqual([]);
+  });
+
+  it('removeHistory：存储失败时状态保持不变', async () => {
+    const item = { id: 'a', text: 'x', createdAt: 1 };
+    useEmojiStore.setState({ history: [item] });
+    (historyStorage.removeHistory as jest.Mock).mockRejectedValueOnce(new Error('fail'));
+    await useEmojiStore.getState().removeHistory('a');
+    expect(useEmojiStore.getState().history).toEqual([item]);
+  });
+
+  it('clearHistory：存储失败仍重置本地列表（乐观清空）', async () => {
+    useEmojiStore.setState({ history: [{ id: 'a', text: 'x', createdAt: 1 }] });
+    (historyStorage.clearHistory as jest.Mock).mockRejectedValueOnce(new Error('fail'));
+    await useEmojiStore.getState().clearHistory();
+    expect(useEmojiStore.getState().history).toEqual([]);
   });
 });

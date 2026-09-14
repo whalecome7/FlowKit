@@ -4,9 +4,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
 import { registerTriggerModule } from '../modules/trigger';
 import { registerReactionModule } from '../modules/reaction';
+import { registerEmojiModule } from '../modules/emoji';
 import ReactionHome from '../modules/reaction/screens/ReactionHome';
 import ReactionGame from '../modules/reaction/screens/ReactionGame';
 import ReactionResult from '../modules/reaction/screens/ReactionResult';
+import EmojiTranslatorScreen from '../modules/emoji/screens/EmojiTranslatorScreen';
+import EmojiHistoryScreen from '../modules/emoji/screens/EmojiHistoryScreen';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -18,6 +21,7 @@ import { navigationRef } from '../modules/trigger/services/NotificationNavigatio
 // 注册所有模块
 registerTriggerModule();
 registerReactionModule();
+registerEmojiModule();
 
 const Stack = createNativeStackNavigator();
 
@@ -76,6 +80,16 @@ function AppNavigator() {
           name="ReactionResult"
           component={ReactionResult}
           options={{ title: '测试结果' }}
+        />
+        <Stack.Screen
+          name="EmojiTranslator"
+          component={EmojiTranslatorScreen}
+          options={{ title: 'emoji 翻译器' }}
+        />
+        <Stack.Screen
+          name="EmojiHistory"
+          component={EmojiHistoryScreen}
+          options={{ title: '历史记录' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

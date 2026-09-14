@@ -77,6 +77,40 @@ describe('useEmojiStore', () => {
     expect(useEmojiStore.getState().picksEmoji).toEqual([]);
   });
 
+  it('resetEditor：清空输入/结果/候选选择，保留 mode 与 history 且不写历史', () => {
+    useEmojiStore.getState().setInput('马');
+    useEmojiStore.getState().generate();
+    useEmojiStore.getState().cycleCandidate(0);
+    useEmojiStore.getState().setMode('emoji');
+    const item = { id: 'a', text: '马', createdAt: 1 };
+    useEmojiStore.setState({ history: [item] });
+    (historyStorage.addHistory as jest.Mock).mockClear();
+
+    useEmojiStore.getState().resetEditor();
+    const s = useEmojiStore.getState();
+    expect(s.input).toBe('');
+    expect(s.tokens).toEqual([]);
+    expect(s.picksExact).toEqual([]);
+    expect(s.picksEmoji).toEqual([]);
+    expect(s.mode).toBe('emoji');
+    expect(s.history).toEqual([item]);
+    expect(historyStorage.addHistory).not.toHaveBeenCalled();
+  });
+
+  it('resetPicks：仅清手动选择，输入与结果保持不变', () => {
+    useEmojiStore.getState().setInput('马');
+    useEmojiStore.getState().generate();
+    useEmojiStore.getState().cycleCandidate(0);
+    const tokensBefore = useEmojiStore.getState().tokens;
+
+    useEmojiStore.getState().resetPicks();
+    const s = useEmojiStore.getState();
+    expect(s.picksExact).toEqual([]);
+    expect(s.picksEmoji).toEqual([]);
+    expect(s.input).toBe('马');
+    expect(s.tokens).toBe(tokensBefore);
+  });
+
   it('removeHistory：存储失败时状态保持不变', async () => {
     const item = { id: 'a', text: 'x', createdAt: 1 };
     useEmojiStore.setState({ history: [item] });

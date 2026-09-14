@@ -21,6 +21,10 @@ interface EmojiState {
   loadHistory: () => Promise<void>;
   removeHistory: (id: string) => Promise<void>;
   clearHistory: () => Promise<void>;
+  /** 清空编辑态（输入/结果/候选选择），保留 mode 与 history */
+  resetEditor: () => void;
+  /** 重置候选为最初输出（仅清手动选择），不重新生成、不写历史 */
+  resetPicks: () => void;
   applyHistory: (text: string) => void;
 }
 
@@ -87,6 +91,14 @@ export const useEmojiStore = create<EmojiState>((set, get) => ({
       console.warn('emoji: 清空历史失败');
     }
     set({ history: [] });
+  },
+
+  resetEditor() {
+    set({ input: '', tokens: [], picksExact: [], picksEmoji: [] });
+  },
+
+  resetPicks() {
+    set({ picksExact: [], picksEmoji: [] });
   },
 
   applyHistory(text) {

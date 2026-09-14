@@ -40,10 +40,20 @@ export default function EmojiTranslatorScreen() {
     setMode,
     generate,
     cycleCandidate,
+    resetEditor,
+    resetPicks,
     applyHistory,
   } = useEmojiStore();
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // 每次从首页进入（Home reset 重建栈 → 新实例 mount）重置为全新状态；
+  // 声明顺序必须在回填 effect 之前（popTo 兜底路径同一次提交内两 effect 都执行，
+  // 需保证先清空后回填），且不可与回填合并为一个分支 effect：回填后的
+  // setParams 清参会让分支再次命中"清空"，把刚生成的内容清掉
+  useEffect(() => {
+    resetEditor();
+  }, [resetEditor]);
 
   // 从历史页回填：有参数则直接生成并清掉参数（防重复触发）
   const routeText: string | undefined = route.params?.text;
@@ -56,6 +66,8 @@ export default function EmojiTranslatorScreen() {
 
   const picks = mode === 'exact' ? picksExact : picksEmoji;
   const canGenerate = input.trim().length > 0;
+  // pick 环绕可回到 0，不能用 Boolean 判断"是否有手动选择"
+  const hasManualPicks = picks.some((p) => p !== undefined);
 
   const onGenerate = () => {
     const text = input.trim();
@@ -94,15 +106,26 @@ export default function EmojiTranslatorScreen() {
         输入一段话或一首诗，逐字转成谐音 emoji
       </Text>
 
-      <TextInput
-        style={[styles.input, { backgroundColor: colors.surface, color: colors.text }]}
-        multiline
-        placeholder={'例如：青梅竹马'}
-        placeholderTextColor={colors.textMuted}
-        value={input}
-        onChangeText={setInput}
-        textAlignVertical="top"
-      />
+      <View style={[styles.inputWrap, { backgroundColor: colors.surface }]}>
+        <TextInput
+          style={[styles.input, { color: colors.text }]}
+          multiline
+          placeholder={'例如：青梅竹马'}
+          placeholderTextColor={colors.textMuted}
+          value={input}
+          onChangeText={setInput}
+          textAlignVertical="top"
+        />
+        {input.length > 0 && (
+          <TouchableOpacity
+            style={styles.clearBtn}
+            onPress={resetEditor}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="清空输入">
+            <Text style={{ color: colors.textMuted, fontSize: 18 }}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <TouchableOpacity
         style={[
@@ -141,16 +164,27 @@ export default function EmojiTranslatorScreen() {
 
           <EmojiResultView tokens={tokens} mode={mode} picks={picks} onPick={cycleCandidate} />
 
-          <TouchableOpacity
-            style={[styles.copyBtn, { borderColor: colors.primary }]}
-            onPress={onCopy}>
-            <Text style={{ color: colors.primary, fontSize: 14 }}>
-              {copied ? '已复制 ✓' : '复制'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                { borderColor: colors.border, opacity: hasManualPicks ? 1 : 0.4 },
+              ]}
+              disabled={!hasManualPicks}
+              onPress={resetPicks}>
+              <Text style={{ color: colors.textSecondary, fontSize: 14 }}>重置</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { borderColor: colors.primary }]}
+              onPress={onCopy}>
+              <Text style={{ color: colors.primary, fontSize: 14 }}>
+                {copied ? '已复制 ✓' : '复制'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={[styles.hint, { color: colors.textMuted }]}>
-            点按任意字可切换候选；纯 emoji 版中 ❓ 表示无可用 emoji 的字
+            点按任意字可切换候选，重置可恢复最初输出；纯 emoji 版中 ❓ 表示无可用 emoji 的字
           </Text>
         </View>
       )}
@@ -167,13 +201,15 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '700' },
   subtitle: { fontSize: 13, marginTop: 4, marginBottom: 12 },
+  inputWrap: { borderRadius: 12, marginBottom: 12 },
   input: {
     minHeight: 96,
     borderRadius: 12,
     padding: 12,
+    paddingRight: 40,
     fontSize: 16,
-    marginBottom: 12,
   },
+  clearBtn: { position: 'absolute', top: 4, right: 4, padding: 8 },
   generateBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   generateText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   resultCard: { marginTop: 16, borderRadius: 14, padding: 16 },
@@ -185,8 +221,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modeBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 13 },
-  copyBtn: {
-    marginTop: 12,
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  actionBtn: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 8,

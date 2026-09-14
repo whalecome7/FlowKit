@@ -44,7 +44,11 @@ export default function EmojiHistoryScreen() {
     <TouchableOpacity
       style={[styles.card, { backgroundColor: colors.surface }]}
       activeOpacity={0.7}
-      onPress={() => navigation.navigate('EmojiTranslator', { text: item.text })}>
+      onPress={() =>
+        // popTo：pop 掉历史页回到栈中已有的编辑器（不在栈中则替换当前页），
+        // 使编辑页返回直达首页；popTo 参数为整体替换，必须始终带 text
+        navigation.popTo('EmojiTranslator', { text: item.text })
+      }>
       <View style={{ flex: 1 }}>
         <Text style={[styles.text, { color: colors.text }]} numberOfLines={2}>
           {item.text}

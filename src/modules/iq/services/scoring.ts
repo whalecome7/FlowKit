@@ -82,6 +82,10 @@ export function scoreMemory(
   return { maxF, maxB, passed };
 }
 
+/** 估算区间半宽：设计标定不确定度 ≈ ±0.5 SD（非测量标准误 SEM） */
+const INTERVAL_HALF_WIDTH = 7.5;
+
+/** 四维合成分权重（设计标定） */
 const WEIGHTS = { fluid: 0.4, verbal: 0.25, memory: 0.2, speed: 0.15 } as const;
 
 /** 专业版报告：维度指数 + 估算区间 + 百分位（设计标定，非诊断） */
@@ -113,8 +117,8 @@ export function computeProReport(paper: Paper, responses: Responses): ProReport 
     dimensionIndices,
     total: {
       estimate,
-      iqLow: Math.round(estimate - 7.5),
-      iqHigh: Math.round(estimate + 7.5),
+      iqLow: Math.round(estimate - INTERVAL_HALF_WIDTH),
+      iqHigh: Math.round(estimate + INTERVAL_HALF_WIDTH),
       percentile,
     },
   };
@@ -125,6 +129,7 @@ export function computeLightReport(paper: Paper, responses: Responses): LightRep
   const fluid = weightedRatio(paper.fluidItems, responses.choice);
   const net = Math.max(0, (responses.speed?.correct ?? 0) - (responses.speed?.wrong ?? 0));
   const combined = fluid.ratio * 0.7 + Math.min(net / 30, 1) * 0.3;
+  // 星级阈值（设计标定；速度项以 30 秒速配的净正确 30 为归一上限）
   const starLevel =
     combined >= 0.85 ? 5 : combined >= 0.7 ? 4 : combined >= 0.55 ? 3 : combined >= 0.4 ? 2 : 1;
   return {

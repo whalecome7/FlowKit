@@ -1,11 +1,14 @@
 import {
   computeLightReport,
   computeProReport,
+  computeReport,
   interpolate,
   isMemoryPass,
   normalCdf,
   scoreMemory,
 } from './scoring';
+import { conversionTables } from '../data/conversionTables';
+import { AGE_BANDS } from '../types';
 import type { MatrixItem, Paper, Responses, VerbalItem } from '../types';
 
 const cell = { shapes: [{ kind: 'circle' as const, fill: 'solid' as const, count: 1 }] };
@@ -125,8 +128,7 @@ describe('computeProReport（golden：adult 档锚点可精确预期）', () => 
     expect(report.total.estimate).toBe(105);
     expect(report.total.iqLow).toBe(98);
     expect(report.total.iqHigh).toBe(113);
-    expect(report.total.percentile).toBeGreaterThan(62);
-    expect(report.total.percentile).toBeLessThan(64);
+    expect(report.total.percentile).toBe(63.1);
   });
 
   it('全空作答：全部钳制到最低锚点', () => {
@@ -136,7 +138,7 @@ describe('computeProReport（golden：adult 档锚点可精确预期）', () => 
     expect(report.total.estimate).toBe(55);
     expect(report.total.iqLow).toBe(48);
     expect(report.total.iqHigh).toBe(63);
-    expect(report.total.percentile).toBeLessThan(1);
+    expect(report.total.percentile).toBe(0.1);
   });
 });
 
@@ -154,5 +156,42 @@ describe('computeLightReport', () => {
 
     const bad: Responses = { choice: {}, memory: {}, speed: { correct: 0, wrong: 5 } };
     expect(computeLightReport(mkPaper('light'), bad).starLevel).toBe(1);
+  });
+});
+
+describe('computeReport 分发与折算表不变量', () => {
+  it('computeReport：按模式分发 pro / light', () => {
+    const empty: Responses = { choice: {}, memory: {}, speed: null };
+    expect(computeReport(mkPaper('pro'), empty).kind).toBe('pro');
+    expect(computeReport(mkPaper('light'), empty).kind).toBe('light');
+  });
+
+  it('折算表不变量：四档四维 锚点 ≥5 点、x 严格升序、y 单调不减、末点 ≥125', () => {
+    for (const band of AGE_BANDS) {
+      const table = conversionTables[band];
+      for (const dim of ['fluid', 'verbal', 'memory', 'speed'] as const) {
+        const anchors = table[dim];
+        expect(anchors.length).toBeGreaterThanOrEqual(5);
+        for (let i = 1; i < anchors.length; i++) {
+          expect(anchors[i][0]).toBeGreaterThan(anchors[i - 1][0]);
+          expect(anchors[i][1]).toBeGreaterThanOrEqual(anchors[i - 1][1]);
+        }
+        expect(anchors[anchors.length - 1][1]).toBeGreaterThanOrEqual(125);
+      }
+    }
+  });
+
+  it('轻量星级档位：4 / 3 / 2 星路径', () => {
+    const paper = mkPaper('light');
+    const mk = (bothRight: boolean, net: number): Responses => ({
+      choice: bothRight
+        ? { m1: { optionIndex: 0, elapsedMs: 0 }, m2: { optionIndex: 0, elapsedMs: 0 } }
+        : { m1: { optionIndex: 0, elapsedMs: 0 }, m2: { optionIndex: 1, elapsedMs: 0 } },
+      memory: {},
+      speed: { correct: net, wrong: 0 },
+    });
+    expect(computeLightReport(paper, mk(true, 0)).starLevel).toBe(4);
+    expect(computeLightReport(paper, mk(false, 24)).starLevel).toBe(3);
+    expect(computeLightReport(paper, mk(false, 6)).starLevel).toBe(2);
   });
 });

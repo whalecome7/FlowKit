@@ -1,4 +1,5 @@
 import { matrixPool } from '../data/matrixItems';
+import { verbalPool } from '../data/verbalItems';
 import { AGE_BANDS } from '../types';
 import type { MatrixCell, ShapeKind } from '../types';
 
@@ -107,6 +108,37 @@ describe('题库加固', () => {
     );
     for (const c of counts) {
       expect(c).toBeGreaterThanOrEqual(3);
+      expect(c).toBeLessThanOrEqual(10);
+    }
+  });
+});
+
+describe('言语类比题库', () => {
+  it('结构合法：四选项、答案索引合法、选项无重复', () => {
+    for (const item of verbalPool) {
+      expect(item.options).toHaveLength(4);
+      expect(new Set(item.options).size).toBe(4);
+      expect(item.answerIndex).toBeGreaterThanOrEqual(0);
+      expect(item.answerIndex).toBeLessThan(4);
+      for (const t of [item.a, item.b, item.c]) expect(t.length).toBeGreaterThan(0);
+      expect(item.ageBands.length).toBeGreaterThan(0);
+      expect(item.difficulty).toBeGreaterThanOrEqual(1);
+      expect(item.difficulty).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('id 唯一、每年龄档 ≥14 题', () => {
+    const ids = verbalPool.map((i) => i.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const band of AGE_BANDS) {
+      expect(verbalPool.filter((i) => i.ageBands.includes(band)).length).toBeGreaterThanOrEqual(14);
+    }
+  });
+
+  it('答案位置分布：0..3 各位置出现次数 ≥5 且 ≤10', () => {
+    const counts = [0, 1, 2, 3].map((p) => verbalPool.filter((i) => i.answerIndex === p).length);
+    for (const c of counts) {
+      expect(c).toBeGreaterThanOrEqual(5);
       expect(c).toBeLessThanOrEqual(10);
     }
   });

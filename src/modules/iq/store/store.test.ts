@@ -56,9 +56,10 @@ describe('useIqStore 施测流程', () => {
     useIqStore.getState().start('pro', 'adult');
     useIqStore.getState().finishPractice();
     useIqStore.getState().finishPractice();
-    useIqStore.getState().recordChoice(2, 1500);
+    const first = useIqStore.getState().session!.paper.fluidItems[0];
+    useIqStore.getState().recordChoice(first.id, 2, 1500);
     const s = useIqStore.getState().session!;
-    expect(s.responses.choice[s.paper.fluidItems[0].id]).toEqual({ optionIndex: 2, elapsedMs: 1500 });
+    expect(s.responses.choice[first.id]).toEqual({ optionIndex: 2, elapsedMs: 1500 });
     expect(s.steps[s.stepIndex]).toEqual({ kind: 'test', section: 'fluid', index: 1 });
   });
 
@@ -69,14 +70,16 @@ describe('useIqStore 施测流程', () => {
     useIqStore.setState({ session: { ...s0, stepIndex: memStart } });
 
     // 第 1 试失败 → 推进到同长度第 2 试
-    useIqStore.getState().recordMemory([0], 100);
+    const t1 = s0.paper.memoryTrials[(s0.steps[memStart] as { index: number }).index];
+    useIqStore.getState().recordMemory(t1.id, [0], 100);
     let s = useIqStore.getState().session!;
     let step = s.steps[s.stepIndex] as { kind: 'test'; index: number };
     expect(step.kind).toBe('test');
     expect(s.paper.memoryTrials[step.index].mode).toBe('forward');
 
     // 第 2 试再失败 → 跳过顺背剩余，直接进入倒背第一试
-    useIqStore.getState().recordMemory([0], 100);
+    const t2 = s.paper.memoryTrials[step.index];
+    useIqStore.getState().recordMemory(t2.id, [0], 100);
     s = useIqStore.getState().session!;
     step = s.steps[s.stepIndex] as { kind: 'test'; index: number };
     expect(step.kind).toBe('test');
@@ -89,7 +92,7 @@ describe('useIqStore 施测流程', () => {
     const memStart = s0.steps.findIndex((x) => x.kind === 'test' && x.section === 'memory');
     useIqStore.setState({ session: { ...s0, stepIndex: memStart } });
     const trial = s0.paper.memoryTrials[(s0.steps[memStart] as { index: number }).index];
-    useIqStore.getState().recordMemory(trial.digits, 100);
+    useIqStore.getState().recordMemory(trial.id, trial.digits, 100);
     const s = useIqStore.getState().session!;
     expect(s.steps[s.stepIndex]).toEqual({
       kind: 'test',
@@ -122,5 +125,53 @@ describe('useIqStore 施测流程', () => {
     useIqStore.getState().start('light', 'adult');
     useIqStore.getState().abort();
     expect(useIqStore.getState().session).toBeNull();
+  });
+
+  it('非法调用为 no-op：无会话 / 练习步 / 非速度步均无副作用', async () => {
+    await useIqStore.getState().finishSpeed(1, 0); // 无会话
+    useIqStore.getState().start('pro', 'adult'); // 首步 = 图形练习
+    const before = useIqStore.getState().session!;
+    useIqStore.getState().recordChoice('x', 1, 10); // 练习步 → 忽略
+    useIqStore.getState().recordMemory('x', [0], 10); // 练习步 → 忽略
+    useIqStore.getState().beginSpeed(); // 非 speed-ready → 忽略
+    await useIqStore.getState().finishSpeed(1, 0); // 非速度步 → 忽略
+    const after = useIqStore.getState().session!;
+    expect(after.stepIndex).toBe(before.stepIndex);
+    expect(after.responses).toEqual(before.responses);
+    expect(useIqStore.getState().lastResult).toBeNull();
+    expect(resultStorage.saveResult).not.toHaveBeenCalled();
+  });
+
+  it('recordMemory 天花板：末段两试皆错后落到 speed-ready', () => {
+    useIqStore.getState().start('pro', 'adult');
+    const s0 = useIqStore.getState().session!;
+    const trials = s0.paper.memoryTrials;
+    const last = trials[trials.length - 1];
+    const pairFirst = trials.findIndex((t) => t.mode === last.mode && t.length === last.length);
+    const stepOf = (ti: number) =>
+      s0.steps.findIndex((x) => x.kind === 'test' && x.section === 'memory' && x.index === ti);
+    useIqStore.setState({ session: { ...s0, stepIndex: stepOf(pairFirst) } });
+
+    const t1 = trials[pairFirst];
+    useIqStore.getState().recordMemory(t1.id, [0], 100); // 第 1 试错
+    const s1 = useIqStore.getState().session!;
+    const step1 = s1.steps[s1.stepIndex] as { index: number };
+    const t2 = trials[step1.index];
+    useIqStore.getState().recordMemory(t2.id, [0], 100); // 第 2 试错 → 天花板
+    const s = useIqStore.getState().session!;
+    expect(s.steps[s.stepIndex]).toEqual({ kind: 'speed-ready' });
+    expect(Object.keys(s.responses.memory)).toHaveLength(2);
+  });
+
+  it('finishSpeed：存储抛错时仍产出结果并进入完成态（light）', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    (resultStorage.saveResult as jest.Mock).mockRejectedValueOnce(new Error('disk'));
+    useIqStore.getState().start('light', 'adult');
+    const s0 = useIqStore.getState().session!;
+    useIqStore.setState({ session: { ...s0, stepIndex: s0.steps.length - 1 } });
+    await useIqStore.getState().finishSpeed(3, 1);
+    expect(useIqStore.getState().session!.stepIndex).toBe(s0.steps.length);
+    expect(useIqStore.getState().lastResult?.report.kind).toBe('light');
+    warn.mockRestore();
   });
 });

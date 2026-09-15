@@ -6,12 +6,16 @@ import { speedTask } from '../data/speedTask';
 
 describe('SymbolSearchView', () => {
   it('进入倒计时态渲染提示且不崩溃', async () => {
+    let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
-      ReactTestRenderer.create(
+      tree = ReactTestRenderer.create(
         <ThemeProvider>
           <SymbolSearchView task={speedTask} paused={false} onDone={() => {}} />
         </ThemeProvider>,
       );
+    });
+    await ReactTestRenderer.act(() => {
+      tree.unmount();
     });
   });
 });

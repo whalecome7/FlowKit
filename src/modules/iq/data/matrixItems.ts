@@ -16,21 +16,26 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 1,
     ageBands: ['6-8', '9-11', '12-16'],
-    rule: '每行图形数量按列递增（1→2→3）',
+    rule: '每行图形数量向右每格递增（1→2→3）',
     cells: [
       one('circle', 1), one('circle', 2), one('circle', 3),
       one('square', 1), one('square', 2), one('square', 3),
       one('triangle', 1), one('triangle', 2), null,
     ],
     options: [
-      one('triangle', 3), one('triangle', 2), one('triangle', 4),
-      one('square', 3), one('triangle', 3, 'hollow'), one('circle', 3),
+      one('triangle', 3),
+      one('triangle', 2),
+      one('triangle', 4),
+      one('square', 3),
+      one('triangle', 3, 'hollow'),
+      one('circle', 3),
     ],
     answerIndex: 0,
   },
 
   // ===== 示例 2：序列·数量递增（难度 2）=====
   // 注：count 上限为 4（测试约束），故规律改为「每两格递增一次」，避免出现 count=5
+  // 注：id 前缀保留历史编号（m 系），为记录中的例外（其余序列题均为 s 前缀）
   {
     id: 'm02',
     kind: 'sequence',
@@ -39,10 +44,14 @@ export const matrixPool: MatrixItem[] = [
     rule: '序列图形数量每两格递增一次（1,1,2,2→3）',
     cells: [one('star', 1), one('star', 1), one('star', 2), one('star', 2), null],
     options: [
-      one('star', 3), one('star', 2), one('star', 4),
-      one('circle', 3), one('star', 3, 'hollow'), one('diamond', 3),
+      one('star', 2),
+      one('star', 3),
+      one('star', 4),
+      one('circle', 3),
+      one('star', 3, 'hollow'),
+      one('diamond', 3),
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // ===== 示例 3：旋转（难度 3）=====
@@ -58,10 +67,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 270), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 180),
-      one('arrow', 1, 'solid', 270), one('arrow', 1, 'solid', 45), one('arrow', 1, 'solid', 315),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 45),
+      one('arrow', 1, 'solid', 315),
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // ===== 示例 4：组合叠加（难度 5）=====
@@ -79,12 +92,14 @@ export const matrixPool: MatrixItem[] = [
       one('star', 1), one('circle', 1), null,
     ],
     options: [
-      { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
-      one('star', 1), one('circle', 1),
+      one('star', 1),
+      one('circle', 1),
       { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
-      one('star', 2), one('circle', 1, 'hollow'),
+      { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
+      one('star', 2),
+      one('circle', 1, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // ===== 示例 5：叠加消去（难度 8）=====
@@ -106,7 +121,6 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'circle', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       { shapes: [
@@ -115,9 +129,10 @@ export const matrixPool: MatrixItem[] = [
         { kind: 'star', fill: 'solid', count: 1 },
       ] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       one('circle', 1),
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 
   // ===== 批 1：数量递进 =====
@@ -127,17 +142,21 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 1,
     ageBands: ['6-8', '9-11', '12-16'],
-    rule: '每行图形数量按列递减（3→2→1），行间图形不同',
+    rule: '每行图形数量向右每格递减（3→2→1），行间图形不同',
     cells: [
       one('star', 3), one('star', 2), one('star', 1),
       one('diamond', 3), one('diamond', 2), one('diamond', 1),
       one('square', 3), one('square', 2), null,
     ],
     options: [
-      one('square', 1), one('square', 2), one('square', 3),
-      one('square', 1, 'hollow'), one('star', 1), one('diamond', 2),
+      one('square', 2),
+      one('square', 3),
+      one('square', 1, 'hollow'),
+      one('star', 1),
+      one('diamond', 2),
+      one('square', 1),
     ],
-    answerIndex: 0,
+    answerIndex: 5,
   },
 
   // m07（难度 1）：行内数量恒定，逐行（逐列）递增
@@ -146,15 +165,19 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 1,
     ageBands: ['6-8', '9-11', '12-16'],
-    rule: '每行三格数量相同，且按行递增（1→2→3）',
+    rule: '每行三格数量相同，且向下每行递增（1→2→3）',
     cells: [
       one('star', 1), one('star', 1), one('star', 1),
       one('diamond', 2), one('diamond', 2), one('diamond', 2),
       one('circle', 3), one('circle', 3), null,
     ],
     options: [
-      one('circle', 3), one('circle', 2), one('circle', 4),
-      one('circle', 3, 'hollow'), one('star', 3), one('diamond', 3),
+      one('circle', 3),
+      one('circle', 2),
+      one('circle', 4),
+      one('circle', 3, 'hollow'),
+      one('star', 3),
+      one('diamond', 3),
     ],
     answerIndex: 0,
   },
@@ -165,17 +188,21 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 2,
     ageBands: ['6-8', '9-11', '12-16'],
-    rule: '每格数量等于列号（1→2→3）；三种形状按行循环移位（circle→square→triangle）',
+    rule: '每格数量等于列号（1→2→3）；三种形状行间循环左移一位（circle→square→triangle）',
     cells: [
       one('circle', 1), one('square', 2), one('triangle', 3),
       one('square', 1), one('triangle', 2), one('circle', 3),
       one('triangle', 1), one('circle', 2), null,
     ],
     options: [
-      one('square', 3), one('square', 2), one('triangle', 3),
-      one('circle', 3), one('square', 4), one('square', 3, 'hollow'),
+      one('square', 2),
+      one('square', 3),
+      one('triangle', 3),
+      one('circle', 3),
+      one('square', 4),
+      one('square', 3, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // m09（难度 2）：数量=列号 + 行内首尾同形
@@ -191,10 +218,14 @@ export const matrixPool: MatrixItem[] = [
       one('triangle', 1), one('circle', 2), null,
     ],
     options: [
-      one('triangle', 3), one('triangle', 2), one('triangle', 4),
-      one('circle', 3), one('square', 3), one('triangle', 3, 'hollow'),
+      one('triangle', 2),
+      one('triangle', 4),
+      one('triangle', 3),
+      one('circle', 3),
+      one('square', 3),
+      one('triangle', 3, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // m10（难度 2）：数量区间平移（2→3→4）
@@ -203,17 +234,21 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 2,
     ageBands: ['6-8', '9-11', '12-16'],
-    rule: '每行图形数量按列递增（2→3→4），行间图形不同',
+    rule: '每行图形数量向右每格递增（2→3→4），行间图形不同',
     cells: [
       one('star', 2), one('star', 3), one('star', 4),
       one('circle', 2), one('circle', 3), one('circle', 4),
       one('diamond', 2), one('diamond', 3), null,
     ],
     options: [
-      one('diamond', 4), one('diamond', 3), one('diamond', 2),
-      one('star', 4), one('circle', 4), one('diamond', 4, 'hollow'),
+      one('diamond', 3),
+      one('diamond', 2),
+      one('star', 4),
+      one('diamond', 4),
+      one('circle', 4),
+      one('diamond', 4, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // ===== 批 2：旋转 / 对称 =====
@@ -223,17 +258,21 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 3,
     ageBands: ['6-8', '9-11', '12-16', 'adult'],
-    rule: '箭头方向按行 +90°、按列 +45° 递增（左上 0°）',
+    rule: '箭头方向向右每格旋转 +45°、向下每格旋转 +90°（左上 0°）',
     cells: [
       one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 45), one('arrow', 1, 'solid', 90),
       one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 135), one('arrow', 1, 'solid', 180),
       one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 225), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 270), one('arrow', 1, 'solid', 225), one('arrow', 1, 'solid', 315),
-      one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'solid', 225),
+      one('arrow', 1, 'solid', 315),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 0),
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 
   // m12（难度 3）：行内两段旋转（+45° 再 +135°），行起点 +90°
@@ -249,10 +288,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 225), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 315),
-      one('arrow', 1, 'solid', 225), one('arrow', 1, 'solid', 45), one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'solid', 315),
+      one('arrow', 1, 'solid', 225),
+      one('arrow', 1, 'solid', 45),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 0),
     ],
-    answerIndex: 0,
+    answerIndex: 5,
   },
 
   // m13（难度 4）：对角等差旋转（行 +45°、列 +90°）
@@ -261,15 +304,19 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 4,
     ageBands: ['6-8', '9-11', '12-16', 'adult'],
-    rule: '箭头方向按行 +45°、按列 +90° 递增（左上 0°）',
+    rule: '箭头方向向右每格旋转 +90°、向下每格旋转 +45°（左上 0°）',
     cells: [
       one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 180),
       one('arrow', 1, 'solid', 45), one('arrow', 1, 'solid', 135), one('arrow', 1, 'solid', 225),
       one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 180), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 270), one('arrow', 1, 'solid', 225), one('arrow', 1, 'solid', 315),
-      one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 225),
+      one('arrow', 1, 'solid', 315),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'solid', 90),
     ],
     answerIndex: 0,
   },
@@ -287,10 +334,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 270), one('arrow', 1, 'solid', 270), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 270), one('arrow', 1, 'solid', 180),
-      one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 45), one('arrow', 1, 'solid', 315),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'solid', 45),
+      one('arrow', 1, 'solid', 315),
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // m15（难度 4）：旋转 + 填充（中间列空心）
@@ -306,10 +357,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 180), one('arrow', 1, 'hollow', 270), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 0), one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 270),
-      one('arrow', 1, 'solid', 180), one('arrow', 1, 'hollow', 0), one('arrow', 1, 'hollow', 180),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'hollow', 0),
+      one('arrow', 1, 'hollow', 180),
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // ===== 批 3：组合叠加 =====
@@ -328,14 +383,14 @@ export const matrixPool: MatrixItem[] = [
       one('square', 1), one('circle', 2), null,
     ],
     options: [
-      { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 3 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 2 }, { kind: 'circle', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       one('square', 1),
       { shapes: [{ kind: 'square', fill: 'hollow', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // m17（难度 5）：并集，第 2 格形状在结果中变空心
@@ -353,14 +408,14 @@ export const matrixPool: MatrixItem[] = [
       one('diamond', 1), one('star', 1), null,
     ],
     options: [
-      { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'star', fill: 'hollow', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'hollow', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       one('diamond', 1),
       one('star', 1, 'hollow'),
+      { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'star', fill: 'hollow', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'square', fill: 'hollow', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 
   // m18（难度 5）：并集，相同形状数量相加
@@ -381,14 +436,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'star', fill: 'solid', count: 2 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 3 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       one('star', 2),
       { shapes: [{ kind: 'star', fill: 'solid', count: 2 }, { kind: 'circle', fill: 'hollow', count: 1 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
+      { shapes: [{ kind: 'star', fill: 'solid', count: 2 }, { kind: 'circle', fill: 'solid', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 5,
   },
 
   // m19（难度 6）：并集去重（保持首次出现顺序）
@@ -454,14 +509,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'diamond', fill: 'solid', count: 3 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 2 }, { kind: 'circle', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'diamond', fill: 'solid', count: 3 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 4 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       one('diamond', 3),
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 3 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 3 }, { kind: 'circle', fill: 'hollow', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // m21（难度 6）：并集 + 第 1 格箭头顺时针 90°
@@ -479,14 +534,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 90), one('diamond', 1), null,
     ],
     options: [
-      { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 180 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 90 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 0 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 180 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 135 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       one('arrow', 1, 'solid', 180),
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 180 }, { kind: 'diamond', fill: 'hollow', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // m22（难度 6）：并集 + 第 2 格形状数量翻倍
@@ -504,14 +559,14 @@ export const matrixPool: MatrixItem[] = [
       one('square', 1), one('circle', 1), null,
     ],
     options: [
-      { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 3 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 4 }] },
+      { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       one('square', 1),
       { shapes: [{ kind: 'square', fill: 'hollow', count: 1 }, { kind: 'circle', fill: 'solid', count: 2 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // ===== 批 4：叠加消去 =====
@@ -523,9 +578,9 @@ export const matrixPool: MatrixItem[] = [
     ageBands: ['12-16', 'adult'],
     rule: '每行前两格中「同时出现」的图形抵消，只保留各出现一次的图形（对称差）',
     cells: [
-      { shapes: [{ kind: 'circle', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
-      { shapes: [{ kind: 'circle', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 1 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
@@ -534,7 +589,6 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
       { shapes: [
         { kind: 'star', fill: 'solid', count: 1 },
@@ -543,9 +597,10 @@ export const matrixPool: MatrixItem[] = [
       ] },
       one('star', 1),
       one('square', 1),
+      { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'star', fill: 'hollow', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 
   // m24（难度 7）：交集（只保留两格同时出现的图形）
@@ -567,14 +622,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      one('square', 1),
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'circle', fill: 'solid', count: 1 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       one('square', 1, 'hollow'),
       one('square', 2),
+      one('square', 1),
     ],
-    answerIndex: 0,
+    answerIndex: 5,
   },
 
   // m25（难度 7）：条件抵消（数量相同抵消，数量不同相加）
@@ -618,9 +673,9 @@ export const matrixPool: MatrixItem[] = [
     ageBands: ['12-16', 'adult'],
     rule: '前两格同时出现的图形抵消；保留的独有图形在结果中全部变空心',
     cells: [
-      { shapes: [{ kind: 'circle', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
-      { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'square', fill: 'solid', count: 1 }] },
-      { shapes: [{ kind: 'circle', fill: 'hollow', count: 1 }, { kind: 'square', fill: 'hollow', count: 1 }] },
+      { shapes: [{ kind: 'triangle', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'triangle', fill: 'hollow', count: 1 }, { kind: 'circle', fill: 'hollow', count: 1 }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 1 }, { kind: 'diamond', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'diamond', fill: 'solid', count: 1 }, { kind: 'star', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'triangle', fill: 'hollow', count: 1 }, { kind: 'star', fill: 'hollow', count: 1 }] },
@@ -629,8 +684,8 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'square', fill: 'hollow', count: 1 }, { kind: 'triangle', fill: 'hollow', count: 1 }] },
       { shapes: [{ kind: 'square', fill: 'solid', count: 1 }, { kind: 'triangle', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'square', fill: 'hollow', count: 1 }, { kind: 'triangle', fill: 'hollow', count: 1 }] },
       { shapes: [{ kind: 'square', fill: 'hollow', count: 1 }, { kind: 'triangle', fill: 'solid', count: 1 }] },
       { shapes: [
         { kind: 'square', fill: 'hollow', count: 1 },
@@ -640,7 +695,7 @@ export const matrixPool: MatrixItem[] = [
       one('square', 1, 'hollow'),
       { shapes: [{ kind: 'square', fill: 'hollow', count: 1 }, { kind: 'diamond', fill: 'hollow', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // ===== 批 5：多规则复合（移动 + 数量 / 大小）=====
@@ -650,7 +705,7 @@ export const matrixPool: MatrixItem[] = [
     kind: 'matrix',
     difficulty: 9,
     ageBands: ['12-16', 'adult'],
-    rule: 'star 每行位置右移一格（行内 star 数量 = 行号）；各格基础形状数量 = 列号',
+    rule: 'star 每行位置右移一格（行内 star 数量 = 行号；行号从 1 起计数）；各格基础形状数量 = 列号',
     cells: [
       { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       one('circle', 2),
@@ -663,14 +718,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'star', fill: 'solid', count: 3 }, { kind: 'triangle', fill: 'solid', count: 3 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 1 }, { kind: 'triangle', fill: 'solid', count: 3 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 3 }, { kind: 'triangle', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'star', fill: 'solid', count: 3 }, { kind: 'triangle', fill: 'solid', count: 3 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 2 }, { kind: 'triangle', fill: 'solid', count: 3 }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 3 }, { kind: 'triangle', fill: 'solid', count: 4 }] },
       { shapes: [{ kind: 'star', fill: 'hollow', count: 3 }, { kind: 'triangle', fill: 'solid', count: 3 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // m28（难度 10）：数量蛇形折返 + 大小棋盘交替 + 形状轮换
@@ -692,14 +747,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'triangle', fill: 'solid', count: 3, size: 'small' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 3, size: 'large' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 2, size: 'small' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 2, size: 'large' }] },
+      { shapes: [{ kind: 'triangle', fill: 'solid', count: 3, size: 'small' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 4, size: 'small' }] },
       { shapes: [{ kind: 'triangle', fill: 'hollow', count: 3, size: 'small' }] },
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // m29（难度 10）：star 反向对角线移动 + 数量 = 列号 + 大小按列交替
@@ -721,14 +776,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'triangle', fill: 'solid', count: 3, size: 'large' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 3, size: 'small' }] },
       { shapes: [{ kind: 'star', fill: 'solid', count: 1, size: 'large' }, { kind: 'triangle', fill: 'solid', count: 3, size: 'large' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 2, size: 'large' }] },
       { shapes: [{ kind: 'triangle', fill: 'solid', count: 4, size: 'large' }] },
+      { shapes: [{ kind: 'triangle', fill: 'solid', count: 3, size: 'large' }] },
       { shapes: [{ kind: 'triangle', fill: 'hollow', count: 3, size: 'large' }] },
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 
   // ===== 批 6：序列题 =====
@@ -741,10 +796,14 @@ export const matrixPool: MatrixItem[] = [
     rule: '图形数量按 1、2 交替',
     cells: [one('star', 1), one('star', 2), one('star', 1), one('star', 2), null],
     options: [
-      one('star', 1), one('star', 2), one('star', 3),
-      one('star', 1, 'hollow'), one('circle', 2), one('diamond', 1),
+      one('star', 2),
+      one('star', 3),
+      one('star', 1, 'hollow'),
+      one('circle', 2),
+      one('diamond', 1),
+      one('star', 1),
     ],
-    answerIndex: 0,
+    answerIndex: 5,
   },
 
   // s02（难度 3）：数量山峰（先增后减）
@@ -756,8 +815,12 @@ export const matrixPool: MatrixItem[] = [
     rule: '图形数量先递增再递减（1,2,3,2→1）',
     cells: [one('star', 1), one('star', 2), one('star', 3), one('star', 2), null],
     options: [
-      one('star', 1), one('star', 2), one('star', 3),
-      one('star', 4), one('star', 1, 'hollow'), one('circle', 1),
+      one('star', 1),
+      one('star', 2),
+      one('star', 3),
+      one('star', 4),
+      one('star', 1, 'hollow'),
+      one('circle', 1),
     ],
     answerIndex: 0,
   },
@@ -774,11 +837,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 135), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 225),
-      one('arrow', 1, 'solid', 135), one('arrow', 1, 'solid', 90),
-      one('arrow', 1, 'solid', 0), one('arrow', 1, 'hollow', 180),
+      one('arrow', 1, 'solid', 225),
+      one('arrow', 1, 'solid', 180),
+      one('arrow', 1, 'solid', 135),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'hollow', 180),
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // s04（难度 3）：形状三循环 + 数量恒定
@@ -790,10 +856,14 @@ export const matrixPool: MatrixItem[] = [
     rule: '形状按 circle、square、triangle 循环，数量恒为 2',
     cells: [one('circle', 2), one('square', 2), one('triangle', 2), one('circle', 2), null],
     options: [
-      one('square', 2), one('circle', 2), one('triangle', 2),
-      one('square', 3), one('diamond', 2), one('square', 2, 'hollow'),
+      one('circle', 2),
+      one('triangle', 2),
+      one('square', 2),
+      one('square', 3),
+      one('diamond', 2),
+      one('square', 2, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // s05（难度 4）：形状循环 + 填充交替
@@ -808,10 +878,14 @@ export const matrixPool: MatrixItem[] = [
       one('circle', 1, 'hollow'), null,
     ],
     options: [
-      one('square', 1), one('square', 1, 'hollow'), one('circle', 1),
-      one('triangle', 1), one('diamond', 1), one('circle', 1, 'hollow'),
+      one('square', 1, 'hollow'),
+      one('circle', 1),
+      one('triangle', 1),
+      one('square', 1),
+      one('diamond', 1),
+      one('circle', 1, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // s06（难度 4）：三格一组，组内数量 3→2→1
@@ -823,10 +897,14 @@ export const matrixPool: MatrixItem[] = [
     rule: '每 3 格一组：组内数量 3→2→1 递减，组间更换形状',
     cells: [one('circle', 3), one('circle', 2), one('circle', 1), one('star', 3), null],
     options: [
-      one('star', 2), one('star', 1), one('star', 3),
-      one('star', 4), one('circle', 2), one('star', 2, 'hollow'),
+      one('star', 1),
+      one('star', 3),
+      one('star', 4),
+      one('circle', 2),
+      one('star', 2),
+      one('star', 2, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 
   // s07（难度 5）：交错规律（奇数格箭头旋转、偶数格圆）
@@ -841,11 +919,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 90), one('circle', 1), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 180), one('arrow', 1, 'solid', 270),
-      one('arrow', 1, 'solid', 90), one('arrow', 1, 'solid', 0),
-      one('circle', 1), one('arrow', 1, 'hollow', 180),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 0),
+      one('circle', 1),
+      one('arrow', 1, 'hollow', 180),
+      one('arrow', 1, 'solid', 180),
     ],
-    answerIndex: 0,
+    answerIndex: 5,
   },
 
   // s08（难度 6）：箭头旋转 + 数量每两格 +1
@@ -860,9 +941,12 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 2, 'solid', 90), one('arrow', 2, 'solid', 135), null,
     ],
     options: [
-      one('arrow', 3, 'solid', 180), one('arrow', 2, 'solid', 180),
-      one('arrow', 3, 'solid', 225), one('arrow', 2, 'solid', 225),
-      one('arrow', 4, 'solid', 180), one('arrow', 3, 'hollow', 180),
+      one('arrow', 3, 'solid', 180),
+      one('arrow', 2, 'solid', 180),
+      one('arrow', 3, 'solid', 225),
+      one('arrow', 2, 'solid', 225),
+      one('arrow', 4, 'solid', 180),
+      one('arrow', 3, 'hollow', 180),
     ],
     answerIndex: 0,
   },
@@ -879,11 +963,14 @@ export const matrixPool: MatrixItem[] = [
       one('arrow', 1, 'solid', 180), one('arrow', 1, 'hollow', 270), null,
     ],
     options: [
-      one('arrow', 1, 'solid', 0), one('arrow', 1, 'hollow', 0),
-      one('arrow', 1, 'solid', 45), one('arrow', 1, 'solid', 90),
-      one('arrow', 1, 'solid', 270), one('arrow', 1, 'solid', 315),
+      one('arrow', 1, 'hollow', 0),
+      one('arrow', 1, 'solid', 0),
+      one('arrow', 1, 'solid', 45),
+      one('arrow', 1, 'solid', 90),
+      one('arrow', 1, 'solid', 270),
+      one('arrow', 1, 'solid', 315),
     ],
-    answerIndex: 0,
+    answerIndex: 1,
   },
 
   // s10（难度 7）：形状三循环 + 数量 2、3 交替
@@ -895,10 +982,14 @@ export const matrixPool: MatrixItem[] = [
     rule: '形状按 circle、star、square 循环（周期 3）；数量按 2、3 交替',
     cells: [one('circle', 2), one('star', 3), one('square', 2), one('circle', 3), null],
     options: [
-      one('star', 2), one('star', 3), one('star', 4),
-      one('square', 2), one('circle', 3), one('star', 2, 'hollow'),
+      one('star', 3),
+      one('star', 4),
+      one('star', 2),
+      one('square', 2),
+      one('circle', 3),
+      one('star', 2, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 2,
   },
 
   // s11（难度 8）：箭头旋转 + 伴随圆数量交替
@@ -916,14 +1007,14 @@ export const matrixPool: MatrixItem[] = [
       null,
     ],
     options: [
-      { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 180 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 180 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 225 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 135 }, { kind: 'circle', fill: 'solid', count: 1 }] },
+      { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 180 }, { kind: 'circle', fill: 'solid', count: 1 }] },
       { shapes: [{ kind: 'arrow', fill: 'solid', count: 1, rotation: 90 }, { kind: 'circle', fill: 'solid', count: 2 }] },
       { shapes: [{ kind: 'arrow', fill: 'hollow', count: 1, rotation: 180 }, { kind: 'circle', fill: 'solid', count: 1 }] },
     ],
-    answerIndex: 0,
+    answerIndex: 3,
   },
 
   // s12（难度 8）：数量山峰 + 形状交替
@@ -935,9 +1026,13 @@ export const matrixPool: MatrixItem[] = [
     rule: '数量先增后减（2,3,4,3→2）；形状按 circle、star 交替',
     cells: [one('circle', 2), one('star', 3), one('circle', 4), one('star', 3), null],
     options: [
-      one('circle', 2), one('star', 2), one('circle', 1),
-      one('circle', 3), one('star', 4), one('circle', 2, 'hollow'),
+      one('star', 2),
+      one('circle', 1),
+      one('circle', 3),
+      one('star', 4),
+      one('circle', 2),
+      one('circle', 2, 'hollow'),
     ],
-    answerIndex: 0,
+    answerIndex: 4,
   },
 ];

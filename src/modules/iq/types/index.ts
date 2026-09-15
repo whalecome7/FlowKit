@@ -20,7 +20,7 @@ export interface ShapeSpec {
   fill: 'solid' | 'hollow'; // line 基元忽略
   count: number; // 1..4，同格内重复个数
   rotation?: ShapeRotation; // 仅 arrow / line 使用
-  size?: 'small' | 'large';
+  size?: 'small' | 'large'; // 省略 = 'large'（cellKey 与渲染均以此为默认）
 }
 
 /** 一格的内容（可多基元组合，按序流式排列） */

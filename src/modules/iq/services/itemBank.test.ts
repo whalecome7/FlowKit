@@ -21,9 +21,11 @@ describe('流体推理题库', () => {
     for (const item of matrixPool) {
       expect(item.difficulty).toBeGreaterThanOrEqual(1);
       expect(item.difficulty).toBeLessThanOrEqual(10);
+      expect(Number.isInteger(item.difficulty)).toBe(true);
       expect(item.ageBands.length).toBeGreaterThan(0);
       expect(item.answerIndex).toBeGreaterThanOrEqual(0);
       expect(item.answerIndex).toBeLessThan(item.options.length);
+      expect(Number.isInteger(item.answerIndex)).toBe(true);
       expect(item.rule.length).toBeGreaterThan(0);
     }
   });
@@ -55,6 +57,7 @@ describe('流体推理题库', () => {
         expect(s.count).toBeGreaterThanOrEqual(1);
         expect(s.count).toBeLessThanOrEqual(4);
         if (s.rotation !== undefined) expect(ROTATIONS).toContain(s.rotation);
+        if (!['arrow', 'line'].includes(s.kind)) expect(s.rotation ?? 0).toBe(0);
       }
     }
   });
@@ -86,6 +89,25 @@ describe('流体推理题库', () => {
         (i) => i.ageBands.includes(band) && i.difficulty >= 2 && i.difficulty <= 7,
       );
       expect(light.length).toBeGreaterThanOrEqual(12);
+    }
+  });
+});
+
+describe('题库加固', () => {
+  it('题干签名唯一：全池 cells 组合不重复', () => {
+    const signature = (item: (typeof matrixPool)[number]) =>
+      item.cells.map((c) => (c ? cellKey(c) : '?')).join('|');
+    const sigs = matrixPool.map(signature);
+    expect(new Set(sigs).size).toBe(sigs.length);
+  });
+
+  it('答案位置分布：0..5 各位置出现次数 ≥3 且 ≤10', () => {
+    const counts = [0, 1, 2, 3, 4, 5].map(
+      (p) => matrixPool.filter((i) => i.answerIndex === p).length,
+    );
+    for (const c of counts) {
+      expect(c).toBeGreaterThanOrEqual(3);
+      expect(c).toBeLessThanOrEqual(10);
     }
   });
 });

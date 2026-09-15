@@ -1,4 +1,6 @@
 import { matrixPool } from '../data/matrixItems';
+import { memoryPool } from '../data/memorySequences';
+import { speedTask, LIGHT_SPEED_ROW_COUNT } from '../data/speedTask';
 import { verbalPool } from '../data/verbalItems';
 import { AGE_BANDS } from '../types';
 import type { MatrixCell, ShapeKind } from '../types';
@@ -141,5 +143,42 @@ describe('言语类比题库', () => {
       expect(c).toBeGreaterThanOrEqual(5);
       expect(c).toBeLessThanOrEqual(10);
     }
+  });
+});
+
+describe('数字广度序列库', () => {
+  it('位数匹配、无三位以上连续重复、每「模式 × 长度」恰 2 试', () => {
+    const seen = new Map<string, number>();
+    for (const t of memoryPool) {
+      expect(t.digits).toHaveLength(t.length);
+      expect(t.digits.every((d) => d >= 0 && d <= 9)).toBe(true);
+      for (let i = 2; i < t.digits.length; i++) {
+        expect(!(t.digits[i] === t.digits[i - 1] && t.digits[i] === t.digits[i - 2])).toBe(true);
+      }
+      const k = `${t.mode}:${t.length}`;
+      seen.set(k, (seen.get(k) ?? 0) + 1);
+    }
+    for (let l = 3; l <= 9; l++) expect(seen.get(`forward:${l}`)).toBe(2);
+    for (let l = 2; l <= 7; l++) expect(seen.get(`backward:${l}`)).toBe(2);
+  });
+});
+
+describe('速度任务', () => {
+  it('行流结构合法且 hasTarget 与实际一致', () => {
+    expect(speedTask.rows.length).toBeGreaterThanOrEqual(120);
+    for (const row of speedTask.rows) {
+      expect(row.symbols).toHaveLength(5);
+      for (const s of row.symbols) expect(SHAPE_WHITELIST).toContain(s);
+      expect(row.hasTarget).toBe(row.symbols.includes(speedTask.target));
+    }
+  });
+
+  it('目标行密度 25%–50%，轻量前 40 行至少 8 个目标', () => {
+    const density = speedTask.rows.filter((r) => r.hasTarget).length / speedTask.rows.length;
+    expect(density).toBeGreaterThanOrEqual(0.25);
+    expect(density).toBeLessThanOrEqual(0.5);
+    expect(
+      speedTask.rows.slice(0, LIGHT_SPEED_ROW_COUNT).filter((r) => r.hasTarget).length,
+    ).toBeGreaterThanOrEqual(8);
   });
 });

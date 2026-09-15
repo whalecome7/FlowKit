@@ -10,6 +10,11 @@ import ReactionGame from '../modules/reaction/screens/ReactionGame';
 import ReactionResult from '../modules/reaction/screens/ReactionResult';
 import EmojiTranslatorScreen from '../modules/emoji/screens/EmojiTranslatorScreen';
 import EmojiHistoryScreen from '../modules/emoji/screens/EmojiHistoryScreen';
+import { registerIqModule } from '../modules/iq';
+import IqHomeScreen from '../modules/iq/screens/IqHomeScreen';
+import IqTestScreen from '../modules/iq/screens/IqTestScreen';
+import IqResultScreen from '../modules/iq/screens/IqResultScreen';
+import IqHistoryScreen from '../modules/iq/screens/IqHistoryScreen';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -22,6 +27,7 @@ import { navigationRef } from '../modules/trigger/services/NotificationNavigatio
 registerTriggerModule();
 registerReactionModule();
 registerEmojiModule();
+registerIqModule();
 
 const Stack = createNativeStackNavigator();
 
@@ -89,6 +95,26 @@ function AppNavigator() {
         <Stack.Screen
           name="EmojiHistory"
           component={EmojiHistoryScreen}
+          options={{ title: '历史记录' }}
+        />
+        <Stack.Screen
+          name="IqHome"
+          component={IqHomeScreen}
+          options={{ title: 'IQ 测试' }}
+        />
+        <Stack.Screen
+          name="IqTest"
+          component={IqTestScreen}
+          options={{ title: '测试中', headerBackVisible: false }}
+        />
+        <Stack.Screen
+          name="IqResult"
+          component={IqResultScreen}
+          options={{ title: '测试结果', headerBackVisible: false }}
+        />
+        <Stack.Screen
+          name="IqHistory"
+          component={IqHistoryScreen}
           options={{ title: '历史记录' }}
         />
       </Stack.Navigator>

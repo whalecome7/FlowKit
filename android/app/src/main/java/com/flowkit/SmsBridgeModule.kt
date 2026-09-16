@@ -153,6 +153,20 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       }
     )
     map.putInt("rulesOnDisk", SmsNativeEngine.diskRulesCount(reactApplicationContext))
+    // 自愈机制状态：库内最新 id（与处理进度对比暴露"疑似漏收窗口"）/ 指纹数 / 最近重扫时间
+    var dbMaxId = -1L
+    try {
+      reactApplicationContext.contentResolver
+        .query(inboxUri(), arrayOf("_id"), null, null, "_id DESC")?.use { c ->
+          if (c.moveToFirst()) dbMaxId = c.getLong(0)
+        }
+    } catch (e: Exception) {
+      Log.e("SmsBridge", "诊断查询库内 id 失败: ${e.message}")
+    }
+    map.putDouble("dbMaxId", dbMaxId.toDouble())
+    map.putInt("fingerprintCount", fingerprints.size)
+    map.putInt("contentFingerprintCount", contentFingerprints.size)
+    map.putDouble("lastRescanTs", prefs.getLong(RESCAN_TS_KEY, -1L).toDouble())
     val perms = Arguments.createMap()
     perms.putBoolean(
       "receiveSms",
@@ -265,6 +279,30 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     /** 单轮补处理上限：死亡窗口内短信过多时分轮消化，避免单次查询过重 */
     private const val MAX_CATCHUP_PER_ROUND = 50
 
+    /** 已处理短信指纹落盘 key（"id:date" 集合；rowid 复用/重复扫描靠它判重） */
+    private const val FINGERPRINTS_KEY = "processed_sms_fingerprints"
+
+    /** 指纹环容量（覆盖重扫窗口绰绰有余，超出丢弃最旧） */
+    private const val MAX_FINGERPRINTS = 100
+
+    /** 自愈重扫间隔（轮次）：每 N 轮从 P-WINDOW 起重扫，捡回被任何原因跳过的短信 */
+    private const val FULL_RESCAN_EVERY_ROUNDS = 6
+
+    /** 自愈重扫窗口（条）：重扫以 P 为上限向前回看的 id 范围 */
+    private const val RESCAN_WINDOW = 30
+
+    /** 升级预热条数：首次启用指纹机制时，把 P 之前最近 N 条标记为已处理（防历史重放风暴） */
+    private const val PREWARM_COUNT = 100
+
+    /** 广播链已处理短信的内容指纹落盘 key（"sender|body|时间秒"；与数据库链互相判重） */
+    private const val CONTENT_FPS_KEY = "processed_sms_content_fps"
+
+    /** 内容指纹环容量 */
+    private const val MAX_CONTENT_FPS = 50
+
+    /** 最近一次自愈重扫时间戳落盘 key（自诊断页展示用） */
+    private const val RESCAN_TS_KEY = "last_rescan_ts"
+
     private var instance: SmsBridgeModule? = null
 
     private var lastSmsId: Long = -1
@@ -272,13 +310,29 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     /** 进度是否已就绪（内存恢复或磁盘恢复；首次运行时才需要"只同步不处理"） */
     private var initialized = false
 
+    /** 已处理指纹（插入序；与磁盘双写，进程重启后恢复） */
+    private val fingerprints = LinkedHashSet<String>()
+
+    /** 已处理内容指纹（广播链/数据库链共用，防同一条短信双链路重复触发） */
+    private val contentFingerprints = LinkedHashSet<String>()
+
+    /** 轮询轮次计数（驱动周期自愈重扫） */
+    private var roundCounter = 0
+
     private fun diagPrefs(context: Context) =
       context.getSharedPreferences(SmsNativeEngine.DIAG_PREFS, Context.MODE_PRIVATE)
 
     /**
      * 检查短信库新短信（ContentObserver / 保活轮询 / 闹钟共用，跨线程安全）。
-     * 进度（lastSmsId）持久化到磁盘：进程被 MIUI 杀死再由闹钟拉起时，
-     * 死亡窗口内到达的短信按 id 区间补处理，不再被"首查同步"误吞。
+     *
+     * 健壮化设计（防漏收）：
+     * - 查询下界取 lastSmsId（含边界）而非严格大于：短信表 rowid 会被复用，
+     *   被删 id 复用的新短信刚好等于进度值，严格大于会永久跳过；
+     * - 指纹判重（id:date）：同 id 但 date 不同 = rowid 复用的新短信，必须处理；
+     *   同 id 同 date = 已处理过，只推进指针不重复触发；
+     * - 周期自愈重扫：每 N 轮从 P-WINDOW 起全量回看，无论指针因何原因卡住/跳过，
+     *   窗口内未处理的短信都会被重新捡起；
+     * - 每轮诊断为"疑似卡死"（库内有更新的短信却零处理）留下痕迹。
      */
     @Synchronized
     fun checkNewSms(context: Context) {
@@ -286,18 +340,23 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
         SmsNativeEngine.ensureRulesLoaded(context)
         val prefs = diagPrefs(context)
         val resolver = context.contentResolver
-        val projection = arrayOf("_id", "address", "body")
+        val projection = arrayOf("_id", "address", "body", "date")
 
-        // 进程重启后从磁盘恢复处理进度
+        // 进程重启后从磁盘恢复处理进度与指纹
         if (!initialized) {
           val saved = prefs.getLong(LAST_SMS_ID_KEY, -1L)
           if (saved >= 0) {
             lastSmsId = saved
+            loadFingerprints(prefs)
+            loadContentFingerprints(prefs)
+            // 首次启用指纹机制（老版本升级上来）：预热 P 之前最近 N 条，
+            // 避免自愈重扫把历史短信整批重放
+            if (!prefs.contains(FINGERPRINTS_KEY)) prewarmFingerprints(resolver, prefs, inboxUri())
             initialized = true
           }
         }
 
-        val inbox = Uri.parse("content://sms/inbox")
+        val inbox = inboxUri()
         if (!initialized) {
           // 首次运行（无任何持久化进度）：只同步最新 id，防历史短信重放
           resolver.query(inbox, projection, null, null, "date DESC")?.use { c ->
@@ -310,28 +369,57 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
           return
         }
 
-        // 防御短信库被清空/重置（_id 序列回退）：进度大于库内最新 id 时重置
-        resolver.query(inbox, projection, null, null, "date DESC")?.use { c ->
-          if (c.moveToFirst() && c.getLong(0) < lastSmsId) {
-            lastSmsId = c.getLong(0)
-            prefs.edit().putLong(LAST_SMS_ID_KEY, lastSmsId).commit()
-            return
-          }
+        // 防御短信库被清空/重置（_id 序列回退）：进度大于库内最大 id 时重置
+        // （用 _id DESC 取库内真实最大 id；不再吞掉边界短信，边界由指纹判定）
+        var maxInboxId = -1L
+        resolver.query(inbox, projection, null, null, "_id DESC")?.use { c ->
+          if (c.moveToFirst()) maxInboxId = c.getLong(0)
+        }
+        if (maxInboxId >= 0 && maxInboxId < lastSmsId) {
+          lastSmsId = maxInboxId
+          prefs.edit().putLong(LAST_SMS_ID_KEY, lastSmsId).commit()
         }
 
-        // 补处理进度之后的所有短信（id 升序，逐条推进并落盘，中断不重复）
+        // 周期自愈：每 N 轮从 P-WINDOW 回看重扫（id 升序，指针只进不退）
+        roundCounter++
+        val fullRescan = roundCounter >= FULL_RESCAN_EVERY_ROUNDS
+        if (fullRescan) roundCounter = 0
+        val floor = if (fullRescan) maxOf(0L, lastSmsId - RESCAN_WINDOW) else lastSmsId
+
+        var handled = 0
         resolver.query(
           inbox, projection,
-          "_id > ?", arrayOf(lastSmsId.toString()),
-          "date ASC"
+          "_id >= ?", arrayOf(floor.toString()),
+          "_id ASC"
         )?.use { c ->
-          var handled = 0
           while (c.moveToNext() && handled < MAX_CATCHUP_PER_ROUND) {
             val id = c.getLong(0)
-            lastSmsId = id
-            prefs.edit().putLong(LAST_SMS_ID_KEY, id).commit()
+            val date = c.getLong(3)
+            val fingerprint = "$id:$date"
+            if (fingerprints.contains(fingerprint)) {
+              // 已处理过：只推进指针（只进不退），不重复触发
+              if (id > lastSmsId) {
+                lastSmsId = id
+                prefs.edit().putLong(LAST_SMS_ID_KEY, id).commit()
+              }
+              continue
+            }
             val sender = c.getString(1) ?: ""
             val body = c.getString(2) ?: ""
+            val editor = prefs.edit()
+            if (id > lastSmsId) {
+              lastSmsId = id
+              editor.putLong(LAST_SMS_ID_KEY, id)
+            }
+            rememberFingerprint(editor, fingerprint)
+            // 广播链已处理过同内容短信（SMS_RECEIVED 携带内容不读库，比库链更早）：
+            // 只推进指针与指纹，不重复触发动作/记录
+            if (contentFingerprints.contains(contentFingerprintOf(sender, body, date))) {
+              editor.commit()
+              continue
+            }
+            rememberContentFingerprint(editor, contentFingerprintOf(sender, body, date))
+            editor.commit()
             Log.d("SmsBridge", "DB 新短信 #$id from $sender: $body")
             // 原生闭环优先：匹配规则并原生执行动作（锁屏时不依赖 JS）
             val match = SmsNativeEngine.handleSms(context, sender, body)
@@ -343,8 +431,136 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
             handled++
           }
         }
+
+        // 疑似卡死哨兵：库里有比进度更新的短信却没处理出任何一条（仅诊断轮打印）
+        if (fullRescan) {
+          prefs.edit().putLong(RESCAN_TS_KEY, System.currentTimeMillis()).apply()
+          Log.d("SmsBridge", "轮询诊断: P=$lastSmsId 库max=$maxInboxId 本轮处理=$handled 指纹=${fingerprints.size}")
+          if (maxInboxId > lastSmsId && handled == 0) {
+            Log.w("SmsBridge", "⚠ 疑似漏收: 库max=$maxInboxId 大于进度 P=$lastSmsId 且本轮零处理")
+          }
+        }
       } catch (e: Exception) {
         Log.e("SmsBridge", "查询短信失败: ${e.message}")
+      }
+    }
+
+    private fun inboxUri(): Uri = Uri.parse("content://sms/inbox")
+
+    /**
+     * 广播直收链：SMS_RECEIVED 广播携带完整短信内容（PDU），不经过读库。
+     * 读库链在部分 ROM 上存在"新短信不可见窗口"（实测小米 HyperOS），
+     * 广播链作为实时通路；两条链通过内容指纹互相判重。
+     */
+    @Synchronized
+    fun handleBroadcastSms(context: Context, sender: String, body: String, timestampMs: Long) {
+      try {
+        if (body.isBlank()) return
+        SmsNativeEngine.ensureRulesLoaded(context)
+        val prefs = diagPrefs(context)
+        if (!initialized) {
+          // 进程可能仅被广播拉起（服务未启动）：恢复持久化状态
+          val saved = prefs.getLong(LAST_SMS_ID_KEY, -1L)
+          if (saved >= 0) {
+            lastSmsId = saved
+            loadFingerprints(prefs)
+            loadContentFingerprints(prefs)
+            initialized = true
+          }
+        }
+        val contentFp = contentFingerprintOf(sender, body, timestampMs)
+        if (contentFingerprints.contains(contentFp)) {
+          Log.d("SmsBridge", "广播短信重复（已处理），跳过: $sender")
+          return
+        }
+        val editor = prefs.edit()
+        rememberContentFingerprint(editor, contentFp)
+        editor.commit()
+        Log.d("SmsBridge", "广播新短信 from $sender: $body")
+        val match = SmsNativeEngine.handleSms(context, sender, body)
+        if (match != null) {
+          emitSmsWithLog(context, sender, body, match)
+        } else {
+          emitSms(context, sender, body)
+        }
+      } catch (e: Exception) {
+        Log.e("SmsBridge", "广播短信处理失败: ${e.message}")
+      }
+    }
+
+    /** 内容指纹：发件人|正文|时间（秒级）——与短信入库的 date（毫秒）按秒对齐 */
+    private fun contentFingerprintOf(sender: String, body: String, timestampMs: Long): String =
+      "$sender|$body|${timestampMs / 1000}"
+
+    /** 记录一条内容指纹（超出容量丢最旧）并写入当前事务 editor */
+    private fun rememberContentFingerprint(editor: android.content.SharedPreferences.Editor, fingerprint: String) {
+      contentFingerprints.add(fingerprint)
+      while (contentFingerprints.size > MAX_CONTENT_FPS) {
+        val oldest = contentFingerprints.firstOrNull() ?: break
+        contentFingerprints.remove(oldest)
+      }
+      editor.putString(CONTENT_FPS_KEY, JSONArray(contentFingerprints.toList()).toString())
+    }
+
+    /** 从磁盘加载内容指纹环 */
+    private fun loadContentFingerprints(prefs: android.content.SharedPreferences) {
+      contentFingerprints.clear()
+      try {
+        val raw = prefs.getString(CONTENT_FPS_KEY, null) ?: return
+        val arr = JSONArray(raw)
+        for (i in 0 until arr.length()) contentFingerprints.add(arr.optString(i, ""))
+        contentFingerprints.remove("")
+      } catch (e: Exception) {
+        Log.e("SmsBridge", "内容指纹恢复失败: ${e.message}")
+      }
+    }
+
+    /** 从磁盘加载指纹环 */
+    private fun loadFingerprints(prefs: android.content.SharedPreferences) {
+      fingerprints.clear()
+      try {
+        val raw = prefs.getString(FINGERPRINTS_KEY, null) ?: return
+        val arr = JSONArray(raw)
+        for (i in 0 until arr.length()) fingerprints.add(arr.optString(i, ""))
+        fingerprints.remove("")
+      } catch (e: Exception) {
+        Log.e("SmsBridge", "指纹恢复失败: ${e.message}")
+      }
+    }
+
+    /** 记录一条指纹（超出容量丢最旧）并写入当前事务 editor */
+    private fun rememberFingerprint(editor: android.content.SharedPreferences.Editor, fingerprint: String) {
+      fingerprints.add(fingerprint)
+      while (fingerprints.size > MAX_FINGERPRINTS) {
+        val oldest = fingerprints.firstOrNull() ?: break
+        fingerprints.remove(oldest)
+      }
+      editor.putString(FINGERPRINTS_KEY, JSONArray(fingerprints.toList()).toString())
+    }
+
+    /** 升级预热：把进度 P 之前最近 N 条标记为已处理（不触发、不推进指针） */
+    private fun prewarmFingerprints(
+      resolver: android.content.ContentResolver,
+      prefs: android.content.SharedPreferences,
+      inbox: Uri,
+    ) {
+      try {
+        val projection = arrayOf("_id", "date")
+        resolver.query(
+          inbox, projection,
+          "_id <= ? AND _id >= ?",
+          arrayOf(lastSmsId.toString(), maxOf(0L, lastSmsId - PREWARM_COUNT).toString()),
+          "_id DESC"
+        )?.use { c ->
+          while (c.moveToNext()) {
+            fingerprints.add("${c.getLong(0)}:${c.getLong(1)}")
+          }
+        }
+        fingerprints.remove("")
+        prefs.edit().putString(FINGERPRINTS_KEY, JSONArray(fingerprints.toList()).toString()).commit()
+        Log.d("SmsBridge", "指纹预热完成: ${fingerprints.size} 条")
+      } catch (e: Exception) {
+        Log.e("SmsBridge", "指纹预热失败: ${e.message}")
       }
     }
 

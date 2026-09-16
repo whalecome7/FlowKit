@@ -13,6 +13,10 @@ interface Diagnostics {
   lastSmsId: number;
   pendingSmsCount: number;
   rulesOnDisk: number;
+  dbMaxId: number;
+  fingerprintCount: number;
+  contentFingerprintCount: number;
+  lastRescanTs: number;
   perms: {
     receiveSms: boolean;
     readSms: boolean;
@@ -121,8 +125,31 @@ export default function DiagnosticsScreen() {
               : '—'}
           </Text>
         </View>
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>库内最新短信</Text>
+          <Text
+            style={{
+              color: diag && diag.dbMaxId > 0 && diag.dbMaxId > diag.lastSmsId ? '#ffb020' : '#22b573',
+            }}
+          >
+            {diag && diag.dbMaxId > 0
+              ? `#${diag.dbMaxId}${diag.dbMaxId > diag.lastSmsId ? ' · 检测中' : ''}`
+              : '—'}
+          </Text>
+        </View>
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>自愈重扫</Text>
+          <Text style={{ color: colors.textSecondary }}>
+            {diag && diag.lastRescanTs > 0
+              ? `✓ ${Math.max(0, Math.round((Date.now() - diag.lastRescanTs) / 1000))} 秒前（每分钟回看补漏）`
+              : '—'}
+          </Text>
+        </View>
         <Text style={[styles.hint, { color: colors.textSecondary }]}>
           💡 进程被系统杀死后，死亡窗口内的新短信会在 App 恢复执行的瞬间自动补触发并记录，不会丢失
+        </Text>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          指纹 {diag?.fingerprintCount ?? 0} · 内容指纹 {diag?.contentFingerprintCount ?? 0}
         </Text>
       </View>
 

@@ -23,7 +23,12 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
-/** 短信桥接模块：启动保活服务、电池优化、短信事件通道 */
+/**
+ * 短信桥接模块：启动保活服务、电池优化、短信事件通道。
+ * 监听范围：普通 SMS（content://sms/inbox）。
+ * 已知边界：5G 消息/RCS（如移动"【中国移动双V】"服务号）存独立存储，
+ * 系统不向第三方应用开放，无法也不需监听（实测确认）。
+ */
 class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 

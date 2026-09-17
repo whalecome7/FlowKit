@@ -4,6 +4,17 @@ import type { TriggerRule } from '../types';
 const RULES_KEY = '@flowkit:trigger:rules';
 const LOGS_KEY = '@flowkit:trigger:logs';
 
+/** 日志写入串行队列：saveLogs 内部"读存储→合并→写"非原子，并发会互相覆盖 */
+let logsWriteQueue: Promise<void> = Promise.resolve();
+const enqueueLogsWrite = <T>(task: () => Promise<T>): Promise<T> => {
+  const next = logsWriteQueue.then(task, task);
+  logsWriteQueue = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
+};
+
 /** 规则持久化存储 */
 export const RuleStorage = {
   async loadRules(): Promise<TriggerRule[]> {
@@ -50,10 +61,12 @@ export const RuleStorage = {
   },
 
   async saveLogs<T>(logs: T[]): Promise<void> {
-    // 从存储读现有日志再合并（避免进程内 state 为空时覆盖历史）
-    const existing = await this.loadLogs<T>();
-    const merged = [...existing, ...logs];
-    const trimmed = merged.slice(-2000); // 上限提到 2000 条
-    await AsyncStorage.setItem(LOGS_KEY, JSON.stringify(trimmed));
+    return enqueueLogsWrite(async () => {
+      // 从存储读现有日志再合并（避免进程内 state 为空时覆盖历史）
+      const existing = await this.loadLogs<T>();
+      const merged = [...existing, ...logs];
+      const trimmed = merged.slice(-2000); // 上限提到 2000 条
+      await AsyncStorage.setItem(LOGS_KEY, JSON.stringify(trimmed));
+    });
   },
 };

@@ -101,7 +101,6 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
     if (get().logs.length === 0) {
       await get().loadLogs();
     }
-    const { logs } = get();
 
     // 记录短信记录（无论是否命中）
     const matches = nativeInfo
@@ -132,19 +131,19 @@ export const useTriggerStore = create<TriggerState>((set, get) => ({
           success: a.success,
         })),
       };
-      const updatedLogs = [...logs, nativeLog];
       // 只传新增日志（saveLogs 内部会读存储合并，避免历史重复累积）
       await RuleStorage.saveLogs([nativeLog]);
-      set({ logs: updatedLogs });
+      // 函数式合并：并发事件交错时基于最新 state 追加，不覆盖对方
+      set((state) => ({ logs: [...state.logs, nativeLog] }));
       return;
     }
 
     if (matches.length > 0) {
       const newLogs = await ActionExecutor.execute(matches, { sender, body });
-      const updatedLogs = [...logs, ...newLogs];
       // 只传新增日志（saveLogs 内部会读存储合并，避免历史重复累积）
       await RuleStorage.saveLogs(newLogs);
-      set({ logs: updatedLogs });
+      // 函数式合并：并发事件交错时基于最新 state 追加，不覆盖对方
+      set((state) => ({ logs: [...state.logs, ...newLogs] }));
     }
   },
 }));

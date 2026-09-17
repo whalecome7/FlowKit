@@ -1,4 +1,4 @@
-import { NativeModules, DeviceEventEmitter } from 'react-native';
+import { NativeModules, DeviceEventEmitter, AppState } from 'react-native';
 import type { TriggerRule } from '../types';
 
 const { SmsBridge } = NativeModules;
@@ -20,38 +20,22 @@ interface PendingSmsEvent {
   actionResults?: { type: string; success: boolean }[];
 }
 
-/**
- * 初始化短信桥接：注册事件监听 + 启动保活服务。
- * 在模块注册时调用一次。
- * 注意：原生模块通过 DeviceEventEmitterModule 发事件，JS 侧必须用
- * 全局 DeviceEventEmitter 监听（经典 NativeModule 无 addListener，
- * 用 NativeEventEmitter 会警告并可能在新架构下崩溃）。
- */
-export function initSmsBridge(): void {
-  if (!SmsBridge || initialized) return;
+const toNativeInfo = (event: PendingSmsEvent): NativeHandledInfo | undefined =>
+  event.nativeHandled
+    ? {
+        ruleName: event.ruleName ?? '',
+        actionResults: event.actionResults ?? [],
+      }
+    : undefined;
 
+/**
+ * 取走并补记离线事件队列（可重复调用；队列为空时为快速无操作）。
+ * RN 实例被销毁但进程存活期间，短信事件会入离线队列且 JS 不会重载，
+ * 因此除启动时外，每次回到前台也要主动取一次。
+ */
+function flushPendingSmsEvents(): void {
   // 延迟获取 store（避免 SmsBridge ↔ store 循环依赖初始化问题）
   const { useTriggerStore } = require('../store');
-
-  const toNativeInfo = (event: PendingSmsEvent): NativeHandledInfo | undefined =>
-    event.nativeHandled
-      ? {
-          ruleName: event.ruleName ?? '',
-          actionResults: event.actionResults ?? [],
-        }
-      : undefined;
-
-  DeviceEventEmitter.addListener(
-    'onSmsReceived',
-    (event: PendingSmsEvent) => {
-      void useTriggerStore
-        .getState()
-        .processSms(event.sender, event.body, toNativeInfo(event));
-    },
-  );
-
-  // 补记离线期间（进程被后台拉起、RN 未启动时）积压的短信事件
-  // （顺序 await：processSms 内部有读存合并，并发会互相覆盖）
   try {
     SmsBridge.takePendingSmsEvents?.((json: string) => {
       try {
@@ -70,6 +54,35 @@ export function initSmsBridge(): void {
   } catch {
     // 原生未就绪时跳过（本次会话无离线积压可补）
   }
+}
+
+/**
+ * 初始化短信桥接：注册事件监听 + 启动保活服务。
+ * 在模块注册时调用一次。
+ * 注意：原生模块通过 DeviceEventEmitterModule 发事件，JS 侧必须用
+ * 全局 DeviceEventEmitter 监听（经典 NativeModule 无 addListener，
+ * 用 NativeEventEmitter 会警告并可能在新架构下崩溃）。
+ */
+export function initSmsBridge(): void {
+  if (!SmsBridge || initialized) return;
+
+  // 延迟获取 store（避免 SmsBridge ↔ store 循环依赖初始化问题）
+  const { useTriggerStore } = require('../store');
+
+  DeviceEventEmitter.addListener(
+    'onSmsReceived',
+    (event: PendingSmsEvent) => {
+      void useTriggerStore
+        .getState()
+        .processSms(event.sender, event.body, toNativeInfo(event));
+    },
+  );
+
+  // 补记启动前积压的离线事件；回到前台时再取一次（覆盖 RN 未重载的入队场景）
+  flushPendingSmsEvents();
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') flushPendingSmsEvents();
+  });
 
   // 确保保活服务在跑
   SmsBridge.startService?.();

@@ -17,6 +17,8 @@ interface Diagnostics {
   fingerprintCount: number;
   contentFingerprintCount: number;
   lastRescanTs: number;
+  notifListenerEnabled: boolean;
+  notifListenerConnected: boolean;
   perms: {
     receiveSms: boolean;
     readSms: boolean;
@@ -145,6 +147,36 @@ export default function DiagnosticsScreen() {
               : '—'}
           </Text>
         </View>
+        <View style={[styles.rowBetween, { marginTop: 10 }]}>
+          <Text style={{ color: colors.text }}>通知监听（服务号通路）</Text>
+          <Text
+            style={{
+              color:
+                diag && diag.notifListenerConnected
+                  ? '#22b573'
+                  : diag && diag.notifListenerEnabled
+                    ? '#ffb020'
+                    : '#ff6b6b',
+            }}
+          >
+            {!diag
+              ? '—'
+              : diag.notifListenerConnected
+                ? '✓ 已连接'
+                : diag.notifListenerEnabled
+                  ? '⚠ 已授权未连接'
+                  : '✗ 未授权'}
+          </Text>
+        </View>
+        {diag && !diag.notifListenerConnected && (
+          <TouchableOpacity
+            onPress={() => SmsBridge?.openNotificationListenerSettings?.()}
+            style={{ marginTop: 6 }}>
+            <Text style={{ color: '#ff6b6b', fontSize: 12 }}>
+              ⚠ 银行/政务等服务号短信被系统隐藏，必须授权「通知使用权」才能捕获 → 点击去授权
+            </Text>
+          </TouchableOpacity>
+        )}
         <Text style={[styles.hint, { color: colors.textSecondary }]}>
           💡 进程被系统杀死后，死亡窗口内的新短信会在 App 恢复执行的瞬间自动补触发并记录，不会丢失
         </Text>

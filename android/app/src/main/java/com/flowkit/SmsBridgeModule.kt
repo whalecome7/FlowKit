@@ -158,6 +158,9 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
       }
     )
     map.putInt("rulesOnDisk", SmsNativeEngine.diskRulesCount(reactApplicationContext))
+    // 通知监听链状态（服务号短信的唯一捕获通路）
+    map.putBoolean("notifListenerEnabled", isNotificationListenerEnabled())
+    map.putBoolean("notifListenerConnected", SmsNotificationListenerStatus.connected)
     // 自愈机制状态：库内最新 id（与处理进度对比暴露"疑似漏收窗口"）/ 指纹数 / 最近重扫时间
     var dbMaxId = -1L
     try {
@@ -235,6 +238,31 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
+  /** 通知使用权是否已授予（短信通知监听链的前提） */
+  private fun isNotificationListenerEnabled(): Boolean {
+    return try {
+      val flat = android.provider.Settings.Secure.getString(
+        reactApplicationContext.contentResolver,
+        "enabled_notification_listeners"
+      ) ?: return false
+      flat.split(":").any { it == "${reactApplicationContext.packageName}/${SmsNotificationListener::class.java.name}" }
+    } catch (e: Exception) {
+      false
+    }
+  }
+
+  /** 跳转系统"通知使用权"设置页（用户手动授予 FlowKit） */
+  @ReactMethod
+  fun openNotificationListenerSettings() {
+    val intent = Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+      reactApplicationContext.startActivity(intent)
+    } catch (e: Exception) {
+      Log.e("SmsBridge", "跳转通知使用权设置失败: ${e.message}")
+    }
+  }
+
   /** JS 同步规则快照（锁屏时原生闭环匹配用） */
   @ReactMethod
   fun setRules(rulesJson: String?) {
@@ -287,17 +315,17 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     /** 已处理短信指纹落盘 key（"id:date" 集合；rowid 复用/重复扫描靠它判重） */
     private const val FINGERPRINTS_KEY = "processed_sms_fingerprints"
 
-    /** 指纹环容量（覆盖重扫窗口绰绰有余，超出丢弃最旧） */
-    private const val MAX_FINGERPRINTS = 100
+    /** 指纹环容量（须 ≥ 重扫窗口 + 余量，保证窗口内已处理短信的判重不失效） */
+    private const val MAX_FINGERPRINTS = 500
 
     /** 自愈重扫间隔（轮次）：每 N 轮从 P-WINDOW 起重扫，捡回被任何原因跳过的短信 */
     private const val FULL_RESCAN_EVERY_ROUNDS = 6
 
-    /** 自愈重扫窗口（条）：重扫以 P 为上限向前回看的 id 范围 */
-    private const val RESCAN_WINDOW = 30
+    /** 自愈重扫窗口（条）：重扫以 P 为上限向前回看的 id 范围（sms 表 id 含自己发送的短信） */
+    private const val RESCAN_WINDOW = 300
 
-    /** 升级预热条数：首次启用指纹机制时，把 P 之前最近 N 条标记为已处理（防历史重放风暴） */
-    private const val PREWARM_COUNT = 100
+    /** 升级预热条数：首次启用指纹机制时，把 P 之前最近 N 条标记为已处理（防历史重放风暴；须 ≥ 重扫窗口） */
+    private const val PREWARM_COUNT = 300
 
     /** 广播链已处理短信的内容指纹落盘 key（"sender|body|时间秒"；与数据库链互相判重） */
     private const val CONTENT_FPS_KEY = "processed_sms_content_fps"
@@ -441,6 +469,7 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
         if (fullRescan) {
           prefs.edit().putLong(RESCAN_TS_KEY, System.currentTimeMillis()).apply()
           Log.d("SmsBridge", "轮询诊断: P=$lastSmsId 库max=$maxInboxId 本轮处理=$handled 指纹=${fingerprints.size}")
+          logVisibilityProbe(context)
           if (maxInboxId > lastSmsId && handled == 0) {
             Log.w("SmsBridge", "⚠ 疑似漏收: 库max=$maxInboxId 大于进度 P=$lastSmsId 且本轮零处理")
           }
@@ -451,6 +480,36 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
     }
 
     private fun inboxUri(): Uri = Uri.parse("content://sms/inbox")
+
+    /**
+     * ROM 可见性探测：HyperOS 对服务号短信（银行/政务 1069/1212 段）按查询方式过滤，
+     * 三方 app 用 content://sms/inbox 查不到这些行（实测 _id=2280 交警短信对 app 隐身）。
+     * 依次探测多条查询路径，返回各自可见的最大 _id，供诊断与路径选择。
+     */
+    private fun probeUriMax(context: Context, uri: Uri, selection: String?): Long {
+      return try {
+        var max = -1L
+        context.contentResolver
+          .query(uri, arrayOf("_id"), selection, null, "_id DESC")?.use { c ->
+            if (c.moveToFirst()) max = c.getLong(0)
+          }
+        max
+      } catch (e: Exception) {
+        -2L
+      }
+    }
+
+    /** 输出各查询路径的可见最大 id（诊断轮调用；对比即可发现被过滤的短信） */
+    fun logVisibilityProbe(context: Context) {
+      val inbox = probeUriMax(context, Uri.parse("content://sms/inbox"), null)
+      val allTable = probeUriMax(context, Uri.parse("content://sms"), null)
+      val typed = probeUriMax(context, Uri.parse("content://sms"), "type = 1")
+      val raw = probeUriMax(context, Uri.parse("content://sms/raw"), null)
+      Log.w(
+        "SmsBridge",
+        "可见性探测: inbox=$inbox 全表=$allTable type=1筛选=$typed raw表=$raw (P=$lastSmsId)"
+      )
+    }
 
     /**
      * 广播直收链：SMS_RECEIVED 广播携带完整短信内容（PDU），不经过读库。
@@ -612,7 +671,8 @@ class SmsBridgeModule(private val reactContext: ReactApplicationContext) :
         }
         arr.put(obj)
         while (arr.length() > MAX_PENDING_EVENTS) arr.remove(0)
-        prefs.edit().putString(PENDING_EVENTS_KEY, arr.toString()).apply()
+        // commit 同步落盘：入队后进程可能立刻被系统回收，apply 异步写会丢事件
+        prefs.edit().putString(PENDING_EVENTS_KEY, arr.toString()).commit()
         Log.d("SmsBridge", "RN 不可用，短信事件已入离线队列（当前 ${arr.length()} 条）")
       } catch (e: Exception) {
         Log.e("SmsBridge", "离线事件入队失败: ${e.message}")

@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import type { View } from 'react-native';
+import { AppState } from 'react-native';
+import type { AppStateStatus, View } from 'react-native';
 import { useGameEngine } from './useGameEngine';
 import { generateMaze } from '../services/generator';
 import { BASE_CELL_DP, INITIAL_CELL_DP, MAX_SCALE_DP, MIN_SCALE_DP } from '../constants';
@@ -86,10 +87,10 @@ afterEach(async () => {
   globalThis.cancelAnimationFrame = origCaf;
 });
 
-/** 手动推进 n 帧（16ms/帧，低于 tick 的 33ms dt 上限） */
-async function stepFrames(n: number) {
+/** 手动推进 n 帧（默认 16ms/帧，低于 tick 的 33ms dt 上限；可传大 dtMs 模拟时间跳跃） */
+async function stepFrames(n: number, dtMs = 16) {
   for (let i = 0; i < n; i++) {
-    frameClock += 16;
+    frameClock += dtMs;
     const due = rafQueue;
     rafQueue = [];
     const ts = frameClock;
@@ -97,6 +98,17 @@ async function stepFrames(n: number) {
       for (const cb of due) cb(ts);
     });
   }
+}
+
+/** 起点格可通行方向（世界坐标单位向量；贯通性保证至少一条通道） */
+function openDirAtStart(maze: MazeData): JoyVector {
+  const [i, j] = maze.start;
+  const r = 2 * j + 1;
+  const c = 2 * i + 1;
+  if (maze.cells[r][c + 1] === 0) return { x: 1, y: 0 };
+  if (maze.cells[r][c - 1] === 0) return { x: -1, y: 0 };
+  if (maze.cells[r + 1][c] === 0) return { x: 0, y: 1 };
+  return { x: 0, y: -1 };
 }
 
 async function mountHarness(maze: MazeData, viewport = VIEWPORT) {
@@ -270,5 +282,70 @@ describe('useGameEngine 镜头', () => {
       Math.max(fitNew, INITIAL_CELL_DP) / env.cellPxRef.current,
       9,
     );
+  });
+});
+
+describe('useGameEngine AppState 生命周期', () => {
+  let appStateHandler: ((s: AppStateStatus) => void) | null = null;
+  let addSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    appStateHandler = null;
+    addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
+      appStateHandler = handler;
+      return { remove: jest.fn() };
+    });
+  });
+
+  afterEach(() => {
+    addSpy.mockRestore();
+  });
+
+  /** 手动触发 AppState change（捕获自引擎注册的监听） */
+  function change(state: AppStateStatus) {
+    expect(appStateHandler).not.toBeNull();
+    appStateHandler!(state);
+  }
+
+  it('AppState 切后台后停止 rAF，回前台恢复并重置时间基准', async () => {
+    const maze = generateMaze(1234567, 'easy');
+    const { env, getApi } = await mountHarness(maze, VIEWPORT);
+    expect(appStateHandler).not.toBeNull(); // 引擎已注册 AppState 监听
+
+    // a) 推进一帧：rAF 链运行中（每帧结束后重新排队）
+    await stepFrames(1);
+    expect(rafQueue.length).toBe(1);
+
+    // 推杆（朝起点格可通行方向），第一帧球正常移动
+    env.joyRef.current = openDirAtStart(maze);
+    const ball = getApi().getBall();
+    const p0 = { x: ball.x, y: ball.y };
+    await stepFrames(1);
+    const p1 = { x: ball.x, y: ball.y };
+    expect(Math.hypot(p1.x - p0.x, p1.y - p0.y)).toBeGreaterThan(0.1);
+    expect(rafQueue.length).toBe(1);
+
+    // b) 切后台：下一帧 tick 早退，不再调度 → 队列空，球停住
+    change('background');
+    await stepFrames(1);
+    expect(rafQueue.length).toBe(0);
+    expect(ball.x).toBe(p1.x);
+    expect(ball.y).toBe(p1.y);
+
+    // c) 回前台：rAF 恢复排队
+    change('active');
+    expect(rafQueue.length).toBe(1);
+
+    // d) 回前台第一帧带 10s 时间跳跃：lastTs 重置 → dt=0，球不因大 dt 瞬移
+    // （若未重置，dt 会被 clamp 到 0.033，位移约 0.36 世界单位）
+    await stepFrames(1, 10000);
+    expect(ball.x).toBe(p1.x);
+    expect(ball.y).toBe(p1.y);
+    expect(rafQueue.length).toBe(1);
+
+    // 后续帧恢复正常步进（16ms → 约 0.18 世界单位）
+    await stepFrames(1);
+    expect(Math.hypot(ball.x - p1.x, ball.y - p1.y)).toBeGreaterThan(0.1);
+    expect(rafQueue.length).toBe(1);
   });
 });

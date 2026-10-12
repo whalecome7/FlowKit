@@ -15,6 +15,9 @@ import IqHomeScreen from '../modules/iq/screens/IqHomeScreen';
 import IqTestScreen from '../modules/iq/screens/IqTestScreen';
 import IqResultScreen from '../modules/iq/screens/IqResultScreen';
 import IqHistoryScreen from '../modules/iq/screens/IqHistoryScreen';
+import { registerMazeModule } from '../modules/maze';
+import MazeGameScreen from '../modules/maze/screens/MazeGameScreen';
+import MazeHistoryScreen from '../modules/maze/screens/MazeHistoryScreen';
 import RuleListScreen from '../modules/trigger/screens/RuleListScreen';
 import RuleEditScreen from '../modules/trigger/screens/RuleEditScreen';
 import LogScreen from '../modules/trigger/screens/LogScreen';
@@ -28,6 +31,7 @@ registerTriggerModule();
 registerReactionModule();
 registerEmojiModule();
 registerIqModule();
+registerMazeModule();
 
 const Stack = createNativeStackNavigator();
 
@@ -116,6 +120,16 @@ function AppNavigator() {
           name="IqHistory"
           component={IqHistoryScreen}
           options={{ title: '历史记录' }}
+        />
+        <Stack.Screen
+          name="MazeGame"
+          component={MazeGameScreen}
+          options={{ title: '迷境' }}
+        />
+        <Stack.Screen
+          name="MazeHistory"
+          component={MazeHistoryScreen}
+          options={{ title: '迷宫历史' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

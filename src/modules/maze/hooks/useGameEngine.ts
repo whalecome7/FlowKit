@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import type { View } from 'react-native';
 import {
   BALL_R,
@@ -52,7 +53,9 @@ export function useGameEngine(opts: EngineOptions) {
   const followHoldRef = useRef(0);
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
-  // 终点世界坐标（每渲染重算；tick 闭包随 effect 依赖 maze 重建）
+  const appActiveRef = useRef(true);
+  const tickRef = useRef<(ts: number) => void>(() => {});
+  // 终点世界坐标（每渲染重算；tick 经 tickRef 始终引用最新闭包）
   const endPos = { x: 2 * maze.end[0] + 1.5, y: 2 * maze.end[1] + 1.5 };
 
   function camScale(): number {
@@ -234,44 +237,68 @@ export function useGameEngine(opts: EngineOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport.width, viewport.height]);
 
-  useEffect(() => {
-    function tick(ts: number) {
-      const dt = lastTsRef.current ? Math.min((ts - lastTsRef.current) / 1000, 0.033) : 0;
-      lastTsRef.current = ts;
-      if (phaseRef.current !== 'won' && viewport.width > 0) {
-        const j = joyRef.current;
-        const mag = Math.hypot(j.x, j.y);
-        if (mag > JOY_DEAD) {
-          if (phaseRef.current === 'ready') {
-            phaseRef.current = 'playing';
-            startTimeRef.current = Date.now();
-            cbRef.current.onStart();
-          }
-          const amp = Math.pow((mag - JOY_DEAD) / (1 - JOY_DEAD), 1.15);
-          const ux = j.x / mag;
-          const uy = j.y / mag;
-          moveBall(maze, ball.current, ux * SPEED * amp * dt, uy * SPEED * amp * dt);
-          const ci = Math.floor((ball.current.x - 1) / 2);
-          const cj = Math.floor((ball.current.y - 1) / 2);
-          if (ci !== curCell.current[0] || cj !== curCell.current[1]) {
-            curCell.current = [ci, cj];
-            cbRef.current.onEnterCell([ci, cj]);
-          }
-          if (Math.hypot(ball.current.x - endPos.x, ball.current.y - endPos.y) < END_TOL) {
-            phaseRef.current = 'won';
-            cbRef.current.onWin(Date.now() - startTimeRef.current);
-          }
-        }
-        updateCamera(dt);
-        writeBall();
-        writeContainer();
-      }
-      rafRef.current = requestAnimationFrame(tick);
+  /** 主循环 tick：提升为 hook 体函数 + tickRef，rAF 链始终使用最新闭包 */
+  function tick(ts: number) {
+    if (!appActiveRef.current) {
+      rafRef.current = 0;
+      return;
     }
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const dt = lastTsRef.current ? Math.min((ts - lastTsRef.current) / 1000, 0.033) : 0;
+    lastTsRef.current = ts;
+    if (phaseRef.current !== 'won' && viewport.width > 0) {
+      const j = joyRef.current;
+      const mag = Math.hypot(j.x, j.y);
+      if (mag > JOY_DEAD) {
+        if (phaseRef.current === 'ready') {
+          phaseRef.current = 'playing';
+          startTimeRef.current = Date.now();
+          cbRef.current.onStart();
+        }
+        const amp = Math.pow((mag - JOY_DEAD) / (1 - JOY_DEAD), 1.15);
+        const ux = j.x / mag;
+        const uy = j.y / mag;
+        moveBall(maze, ball.current, ux * SPEED * amp * dt, uy * SPEED * amp * dt);
+        const ci = Math.floor((ball.current.x - 1) / 2);
+        const cj = Math.floor((ball.current.y - 1) / 2);
+        if (ci !== curCell.current[0] || cj !== curCell.current[1]) {
+          curCell.current = [ci, cj];
+          cbRef.current.onEnterCell([ci, cj]);
+        }
+        if (Math.hypot(ball.current.x - endPos.x, ball.current.y - endPos.y) < END_TOL) {
+          phaseRef.current = 'won';
+          cbRef.current.onWin(Date.now() - startTimeRef.current);
+        }
+      }
+      updateCamera(dt);
+      writeBall();
+      writeContainer();
+    }
+    rafRef.current = requestAnimationFrame(tickRef.current);
+  }
+  tickRef.current = tick;
+
+  useEffect(() => {
+    lastTsRef.current = 0;
+    rafRef.current = requestAnimationFrame(tickRef.current);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    };
   }, [maze, viewport.width, viewport.height]);
+
+  // 切后台停止 rAF 调度（避免空转与向 detach 视图直写），回前台恢复并重置时间基准
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      const active = state === 'active';
+      const wasActive = appActiveRef.current;
+      appActiveRef.current = active;
+      if (active && !wasActive && rafRef.current === 0) {
+        lastTsRef.current = 0; // 回前台重置时间基准，避免大 dt
+        rafRef.current = requestAnimationFrame(tickRef.current);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   return {
     /** 供外部读取当前球位置（幽灵/缩略图） */

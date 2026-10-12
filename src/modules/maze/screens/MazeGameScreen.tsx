@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useTheme } from '../../../theme';
-import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed } from '../constants';
+import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
+import TrailLayer from '../components/TrailLayer';
 import HudBar from '../components/HudBar';
 import Joystick from '../components/Joystick';
 import { WinModal } from '../components/GameModals';
@@ -38,6 +39,8 @@ export default function MazeGameScreen() {
   const setSeed = useMazeStore((s) => s.setSeed);
   const resetGame = useMazeStore((s) => s.resetGame);
   const setBest = useMazeStore((s) => s.setBest);
+  const trailStyle = useMazeStore((s) => s.trailStyle);
+  const cycleTrailStyle = useMazeStore((s) => s.cycleTrailStyle);
 
   const { colors } = useTheme();
   const joyRef = useRef<JoyVector>({ x: 0, y: 0 });
@@ -87,6 +90,9 @@ export default function MazeGameScreen() {
   const camScaleRef = useRef(scale);
   const [trailVersion, setTrailVersion] = useState(0);
   const trailRef = useRef<CellPoint[]>([[maze.start[0], maze.start[1]]]);
+  // trailVersion 作为唯一依赖：ref 写入不触发渲染，需版本号驱动快照重建
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const trailSnapshot = useMemo(() => trailRef.current.slice(), [trailVersion]);
 
   useEffect(() => {
     camScaleRef.current = scale;
@@ -158,9 +164,7 @@ export default function MazeGameScreen() {
   const restart = resetAndBump;
 
   // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
-  // trailVersion：轨迹层刷新信号（T14 的 TrailLayer 将消费）
   void nowTick;
-  void trailVersion;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -178,6 +182,15 @@ export default function MazeGameScreen() {
         {viewport.width > 0 && (
           <View ref={containerRef} style={styles.world}>
             <MazeSvg maze={maze} palette={palette} cellPx={BASE_CELL_DP} />
+            <TrailLayer
+              maze={maze}
+              cellPx={BASE_CELL_DP}
+              palette={palette}
+              trailStyle={trailStyle}
+              trail={trailSnapshot}
+              ghost={null}
+              shortestPath={null}
+            />
           </View>
         )}
         <BallView ref={ballRef} />
@@ -198,6 +211,13 @@ export default function MazeGameScreen() {
             style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
             onPress={restart}>
             <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>↻ 重开</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
+            onPress={cycleTrailStyle}>
+            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>
+              {TRAIL_STYLE_LABEL[trailStyle]}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -2,7 +2,7 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Text, TextInput, TouchableOpacity } from 'react-native';
 import { ThemeProvider } from '../../../theme';
-import { SeedModal, WinModal } from './GameModals';
+import { SeedModal, ViewBanner, WinModal } from './GameModals';
 import { PALETTES } from '../constants';
 
 // 文本节点的 children 可能为字符串、数字或嵌套数组（如「步数 {steps} · 最佳 {bestText}」会拆成多段），
@@ -119,6 +119,70 @@ describe('SeedModal', () => {
     });
     const input = tree.root.findByType(TextInput);
     expect(input.props.value).toBe('7654321');
+    await ReactTestRenderer.act(() => {
+      tree.unmount();
+    });
+  });
+});
+
+describe('ViewBanner', () => {
+  it('visible=false 不渲染，visible=true 渲染三按钮与回调', async () => {
+    const onTogglePath = jest.fn();
+    const onRechallenge = jest.fn();
+    const onClose = jest.fn();
+    let tree!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(() => {
+      tree = ReactTestRenderer.create(
+        <ThemeProvider>
+          <ViewBanner
+            visible={false}
+            text="t"
+            pathShown={false}
+            palette={PALETTES[0]}
+            onTogglePath={onTogglePath}
+            onRechallenge={onRechallenge}
+            onClose={onClose}
+          />
+        </ThemeProvider>,
+      );
+    });
+    expect(tree.root.findAllByProps({ children: '📏 最短路径' }).length).toBe(0);
+    await ReactTestRenderer.act(() => {
+      tree.update(
+        <ThemeProvider>
+          <ViewBanner
+            visible
+            text="🔍 历史迷宫 · 轻松 · 当年 00:45.0 / 12 步"
+            pathShown={false}
+            palette={PALETTES[0]}
+            onTogglePath={onTogglePath}
+            onRechallenge={onRechallenge}
+            onClose={onClose}
+          />
+        </ThemeProvider>,
+      );
+    });
+    const btn = (label: string) =>
+      tree.root.findAllByType(TouchableOpacity).find((n) => {
+        const txt = n
+          .findAllByType(Text)
+          .map((t) => t.props.children)
+          .flat()
+          .join('');
+        return txt.includes(label);
+      })!;
+    await ReactTestRenderer.act(() => {
+      btn('📏 最短路径').props.onPress();
+    });
+    expect(onTogglePath).toHaveBeenCalled();
+    await ReactTestRenderer.act(() => {
+      btn('重新挑战').props.onPress();
+    });
+    expect(onRechallenge).toHaveBeenCalled();
+    await ReactTestRenderer.act(() => {
+      btn('关闭').props.onPress();
+    });
+    expect(onClose).toHaveBeenCalled();
     await ReactTestRenderer.act(() => {
       tree.unmount();
     });

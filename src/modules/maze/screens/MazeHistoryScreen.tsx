@@ -41,7 +41,9 @@ export default function MazeHistoryScreen() {
 
   const onDelete = useCallback(
     (at: number) => {
-      void removeHistoryRecord(at).then(setHistory);
+      void removeHistoryRecord(at).then(setHistory).catch(() => {
+        // 删除失败静默（存储异常）
+      });
     },
     [setHistory],
   );

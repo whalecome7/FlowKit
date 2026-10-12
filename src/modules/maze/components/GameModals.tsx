@@ -111,7 +111,7 @@ interface ViewBannerProps {
 export function ViewBanner({ visible, text, pathShown, palette, onTogglePath, onRechallenge, onClose }: ViewBannerProps) {
   if (!visible) return null;
   return (
-    <View style={styles.banner}>
+    <View style={styles.banner} pointerEvents="box-none">
       <Text style={styles.bannerText}>{text}</Text>
       <View style={styles.bannerRow}>
         <TouchableOpacity style={styles.bannerBtn} onPress={onTogglePath}>

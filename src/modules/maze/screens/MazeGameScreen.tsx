@@ -81,8 +81,7 @@ export default function MazeGameScreen() {
     useMazeStore.getState().resetGame();
   }, []);
 
-  // 路由参数播种查看模式：须声明在挂载 resetGame effect 之后（先清场后播种），
-  // difficulty/seed 变更会驱动 maze 重建，引擎随 [maze] 依赖自动回到起点
+  // 路由参数播种查看模式：须声明在挂载 resetGame effect 之后（先清场后播种）
   useEffect(() => {
     if (!viewRecord) return;
     useMazeStore.getState().setDifficulty(viewRecord.difficulty);
@@ -90,7 +89,11 @@ export default function MazeGameScreen() {
     useMazeStore.getState().resetGame();
     setViewingRecord(viewRecord);
     setShowShortest(false);
-  }, [viewRecord]);
+    // 无条件 bump：即使 seed/difficulty 与当前值相同（maze 引用不变），也必须重置引擎
+    setResetToken((v) => v + 1);
+    // 消费参数，避免关闭横幅后 route.params 残留
+    navigation.setParams({ viewRecord: undefined });
+  }, [viewRecord, navigation]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -235,9 +238,11 @@ export default function MazeGameScreen() {
     return () => clearInterval(t);
   }, [viewport.width, viewport.height]);
 
-  // 重开一局的统一入口：先归零 store，再 bump 引擎 resetToken
+  // 重开一局的统一入口：先归零 store 并清查看态，再 bump 引擎 resetToken
   const resetAndBump = () => {
     resetGame();
+    setViewingRecord(null);
+    setShowShortest(false);
     setResetToken((v) => v + 1);
   };
 
@@ -385,11 +390,7 @@ export default function MazeGameScreen() {
           pathShown={showShortest}
           palette={palette}
           onTogglePath={() => setShowShortest((v) => !v)}
-          onRechallenge={() => {
-            setViewingRecord(null);
-            setShowShortest(false);
-            resetAndBump();
-          }}
+          onRechallenge={resetAndBump}
           onClose={() => {
             setViewingRecord(null);
             setShowShortest(false);
@@ -481,7 +482,7 @@ const styles = StyleSheet.create({
   gbtn: { flexGrow: 1, flexBasis: '45%', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   gbtnTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
   gbtnText: { fontSize: 14, fontWeight: '600' },
-  hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center' },
+  hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 30 },
   hintText: {
     backgroundColor: 'rgba(50,40,90,0.92)',
     color: '#fff',

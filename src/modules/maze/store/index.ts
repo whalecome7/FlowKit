@@ -16,8 +16,10 @@ interface MazeState {
   trailStyle: TrailStyle;
   setDifficulty: (d: MazeDifficulty) => void;
   setSeed: (s: number) => void;
+  /** @contract 由引擎在首次移动时单点调用；此前须为 ready 阶段（won 后重开须先 resetGame） */
   startGame: (at: number) => void;
   addStep: () => void;
+  /** @contract 由引擎在到达终点时单点调用；调用后须走 resetGame 才能再次 startGame */
   winGame: (elapsedMs: number) => void;
   resetGame: () => void;
   setBest: (best: Partial<Record<MazeDifficulty, BestRecord>>) => void;

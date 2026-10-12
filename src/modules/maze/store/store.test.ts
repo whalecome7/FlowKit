@@ -44,6 +44,8 @@ describe('maze store', () => {
     const s = useMazeStore.getState();
     expect(s.phase).toBe('ready');
     expect(s.steps).toBe(0);
+    expect(s.startedAt).toBe(0);
+    expect(s.elapsedMs).toBe(0);
     expect(s.difficulty).toBe('normal');
     expect(s.seed).toBe(7654321);
   });
@@ -55,5 +57,12 @@ describe('maze store', () => {
     expect(useMazeStore.getState().trailStyle).toBe('fade');
     useMazeStore.getState().cycleTrailStyle();
     expect(useMazeStore.getState().trailStyle).toBe('rainbow');
+  });
+
+  it('直接设置轨迹样式', () => {
+    useMazeStore.getState().setTrailStyle('fade');
+    expect(useMazeStore.getState().trailStyle).toBe('fade');
+    useMazeStore.getState().setTrailStyle('mono');
+    expect(useMazeStore.getState().trailStyle).toBe('mono');
   });
 });

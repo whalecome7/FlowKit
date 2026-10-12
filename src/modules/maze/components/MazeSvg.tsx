@@ -6,7 +6,7 @@ import type { MazeData } from '../types';
 interface Props {
   maze: MazeData;
   palette: Palette;
-  /** 每单元绘制像素（dp）。默认 BASE_CELL_DP，缩放由容器 transform/澄清机制处理 */
+  /** 每单元绘制像素（dp）。调用方传入（通常为 BASE_CELL_DP），缩放由容器 transform/澄清机制处理 */
   cellPx: number;
 }
 
@@ -15,20 +15,20 @@ function MazeSvgInner({ maze, palette, cellPx }: Props) {
   const viewSize = maze.G * cellPx;
 
   const wallRects = useMemo(() => {
-    const G = maze.G;
+    const grid = maze.G;
     const rects: React.ReactElement[] = [];
     const inset = cellPx * 0.02;
     const rx = cellPx * 0.18;
-    for (let r = 0; r < G; r++) {
-      for (let c = 0; c < G; c++) {
+    for (let r = 0; r < grid; r++) {
+      for (let c = 0; c < grid; c++) {
         if (maze.cells[r][c] !== 1) continue;
         let near = maze.inS[r][c];
         if (!near) {
           near =
             (r > 0 && maze.inS[r - 1][c]) ||
-            (r < G - 1 && maze.inS[r + 1][c]) ||
+            (r < grid - 1 && maze.inS[r + 1][c]) ||
             (c > 0 && maze.inS[r][c - 1]) ||
-            (c < G - 1 && maze.inS[r][c + 1]);
+            (c < grid - 1 && maze.inS[r][c + 1]);
         }
         if (!near) continue;
         rects.push(

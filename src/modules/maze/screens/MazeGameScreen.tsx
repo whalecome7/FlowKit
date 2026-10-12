@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import { useTheme } from '../../../theme';
 import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed } from '../constants';
 import MazeSvg from '../components/MazeSvg';
 import HudBar from '../components/HudBar';
+import Joystick from '../components/Joystick';
 import { generateMaze } from '../services/generator';
 import { loadBest } from '../services/storage';
 import { useMazeStore } from '../store';
-import type { MazeDifficulty } from '../types';
+import type { JoyVector, MazeDifficulty } from '../types';
 
 function randSeed(): number {
   return 1000000 + Math.floor(Math.random() * 9000000);
@@ -33,6 +35,8 @@ export default function MazeGameScreen() {
   const resetGame = useMazeStore((s) => s.resetGame);
   const setBest = useMazeStore((s) => s.setBest);
 
+  const { colors } = useTheme();
+  const joyRef = useRef<JoyVector>({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [resetToken, setResetToken] = useState(0);
   const [nowTick, setNowTick] = useState(0);
@@ -81,6 +85,17 @@ export default function MazeGameScreen() {
     setResetToken((v) => v + 1);
   };
 
+  const newMaze = () => {
+    setSeed(randSeed());
+    resetGame();
+    setResetToken((v) => v + 1);
+  };
+
+  const restart = () => {
+    resetGame();
+    setResetToken((v) => v + 1);
+  };
+
   // resetToken：T12 引擎的"重启本局"信号（当前占位，接入后由引擎消费）
   // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
   void resetToken;
@@ -109,6 +124,25 @@ export default function MazeGameScreen() {
           </View>
         )}
       </View>
+      <View style={[styles.bottom, { backgroundColor: palette.bg }]}>
+        <Joystick
+          onMove={(v) => {
+            joyRef.current = v;
+          }}
+        />
+        <View style={styles.btnGrid}>
+          <TouchableOpacity
+            style={[styles.gbtn, { backgroundColor: palette.wall }]}
+            onPress={newMaze}>
+            <Text style={styles.gbtnTextLight}>🎲 新迷宫</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
+            onPress={restart}>
+            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>↻ 重开</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -117,4 +151,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   viewport: { flex: 1, overflow: 'hidden' },
   world: { position: 'absolute', left: 0, top: 0 },
+  bottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  btnGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gbtn: { flexGrow: 1, flexBasis: '45%', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  gbtnTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  gbtnText: { fontSize: 14, fontWeight: '600' },
 });

@@ -7,9 +7,11 @@ import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import HudBar from '../components/HudBar';
 import Joystick from '../components/Joystick';
+import { WinModal } from '../components/GameModals';
 import { useGameEngine } from '../hooks/useGameEngine';
 import { generateMaze } from '../services/generator';
-import { loadBest } from '../services/storage';
+import { addHistoryRecord, loadBest, upsertBest } from '../services/storage';
+import { encodeTrail } from '../services/trailCodec';
 import { useMazeStore } from '../store';
 import type { CellPoint, JoyVector, MazeDifficulty } from '../types';
 
@@ -104,7 +106,28 @@ export default function MazeGameScreen() {
       useMazeStore.getState().addStep();
       setTrailVersion((v) => v + 1);
     },
-    onWin: (ms) => useMazeStore.getState().winGame(ms),
+    onWin: (ms) => {
+      useMazeStore.getState().winGame(ms);
+      const stepsNow = useMazeStore.getState().steps;
+      const rec = {
+        difficulty,
+        seed,
+        timeMs: ms,
+        steps: stepsNow,
+        at: Date.now(),
+        trail: encodeTrail(trailRef.current),
+      };
+      void upsertBest(difficulty, { timeMs: ms, steps: stepsNow })
+        .then((refreshed) => {
+          if (refreshed) loadBest().then(useMazeStore.getState().setBest);
+        })
+        .catch(() => {
+          // 存储写入失败静默（不影响对局）
+        });
+      void addHistoryRecord(rec)
+        .then(useMazeStore.getState().setHistory)
+        .catch(() => {});
+    },
   });
 
   useEffect(() => {
@@ -176,6 +199,15 @@ export default function MazeGameScreen() {
           </TouchableOpacity>
         </View>
       </View>
+      <WinModal
+        visible={phase === 'won'}
+        timeText={fmtTime(elapsedMs)}
+        steps={steps}
+        bestText={bestText}
+        palette={palette}
+        onAgain={restart}
+        onNewMaze={newMaze}
+      />
     </View>
   );
 }

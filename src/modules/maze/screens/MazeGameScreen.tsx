@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useTheme } from '../../../theme';
 import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
+import Minimap from '../components/Minimap';
 import TrailLayer from '../components/TrailLayer';
 import HudBar from '../components/HudBar';
 import Joystick from '../components/Joystick';
 import { WinModal } from '../components/GameModals';
 import { useGameEngine } from '../hooks/useGameEngine';
-import { generateMaze } from '../services/generator';
+import { findShortestPath, generateMaze } from '../services/generator';
 import { addHistoryRecord, loadBest, upsertBest } from '../services/storage';
 import { encodeTrail } from '../services/trailCodec';
 import { useMazeStore } from '../store';
@@ -80,25 +81,36 @@ export default function MazeGameScreen() {
     setViewport({ width, height });
   };
 
-  // 初始镜头：小迷宫全览、大迷宫按基础尺寸（游戏循环接管后由引擎直写）
-  const fit =
-    viewport.width > 0 ? Math.min(viewport.width, viewport.height) / (maze.G + 1.6) : 12;
-  const scale = Math.max(fit, INITIAL_CELL_DP) / BASE_CELL_DP;
-
   const ballRef = useRef<View>(null);
   const containerRef = useRef<View>(null);
-  const camScaleRef = useRef(scale);
+  const camScaleRef = useRef(1);
+  const cellPxRef = useRef(BASE_CELL_DP);
+  const [cellPxState, setCellPxState] = useState(BASE_CELL_DP);
+  const [miniSnap, setMiniSnap] = useState({ ball: { x: 0, y: 0 }, view: { x: 0, y: 0, w: 0, h: 0 } });
+  const [hint, setHint] = useState('');
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const pinchRef = useRef<{ d: number } | null>(null);
+  const lastTapRef = useRef(0);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [trailVersion, setTrailVersion] = useState(0);
   const trailRef = useRef<CellPoint[]>([[maze.start[0], maze.start[1]]]);
   // trailVersion 作为唯一依赖：ref 写入不触发渲染，需版本号驱动快照重建
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const trailSnapshot = useMemo(() => trailRef.current.slice(), [trailVersion]);
 
+  // 初始/澄清后镜头：小迷宫全览、大迷宫按初始单元尺寸（游戏循环接管后由引擎直写）
   useEffect(() => {
-    camScaleRef.current = scale;
-  }, [scale]);
+    if (viewport.width === 0) return;
+    const fitNew = Math.min(viewport.width, viewport.height) / (maze.G + 1.6);
+    camScaleRef.current = Math.max(fitNew, INITIAL_CELL_DP) / cellPxState;
+  }, [viewport.width, viewport.height, maze, cellPxState]);
 
-  useGameEngine({
+  useEffect(() => {
+    cellPxRef.current = cellPxState;
+  }, [cellPxState]);
+
+  const engine = useGameEngine({
     maze,
     joyRef,
     ballViewRef: ballRef,
@@ -106,6 +118,7 @@ export default function MazeGameScreen() {
     viewport,
     resetToken,
     camScaleRef,
+    cellPxRef,
     onStart: () => useMazeStore.getState().startGame(Date.now()),
     onEnterCell: (cell) => {
       trailRef.current.push(cell);
@@ -137,11 +150,41 @@ export default function MazeGameScreen() {
         });
     },
   });
+  const engineRef = useRef(engine);
+  engineRef.current = engine;
 
   useEffect(() => {
     trailRef.current = [[maze.start[0], maze.start[1]]];
     setTrailVersion((v) => v + 1);
   }, [maze, resetToken]);
+
+  // 卸载清理：清掉可能挂起的防抖/提示定时器
+  useEffect(
+    () => () => {
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    },
+    [],
+  );
+
+  // 缩略图低频采样（球位置与视口世界范围），150ms 足够 UI 平滑
+  useEffect(() => {
+    const t = setInterval(() => {
+      const b = engineRef.current.getBall();
+      const c = engineRef.current.getCam();
+      const k = cellPxRef.current * engineRef.current.getCamScale();
+      setMiniSnap({
+        ball: { x: b.x, y: b.y },
+        view: {
+          x: c.x - viewport.width / k / 2,
+          y: c.y - viewport.height / k / 2,
+          w: viewport.width / k,
+          h: viewport.height / k,
+        },
+      });
+    }, 150);
+    return () => clearInterval(t);
+  }, [viewport.width, viewport.height]);
 
   // 重开一局的统一入口：先归零 store，再 bump 引擎 resetToken
   const resetAndBump = () => {
@@ -163,6 +206,78 @@ export default function MazeGameScreen() {
 
   const restart = resetAndBump;
 
+  const showHint = () => {
+    const b = engineRef.current.getBall();
+    const from: CellPoint = [Math.floor((b.x - 1) / 2), Math.floor((b.y - 1) / 2)];
+    const path = findShortestPath(maze, from, maze.end);
+    setHint(path && path.length > 1 ? `距终点还有 ${path.length - 1} 格路程` : '已经在终点啦');
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    hintTimerRef.current = setTimeout(() => setHint(''), 1800);
+  };
+
+  // 手势：单指平移 / 双指缩放 / 双击回跟随；手势结束后 250ms 澄清缩放
+  const gesture = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          const now = Date.now();
+          if (now - lastTapRef.current < 300) {
+            engineRef.current.followBall();
+            lastTapRef.current = 0;
+            dragRef.current = null;
+            pinchRef.current = null;
+            return;
+          }
+          lastTapRef.current = now;
+          const touches = evt.nativeEvent.touches;
+          if (touches.length >= 2) {
+            pinchRef.current = {
+              d: Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY),
+            };
+          } else if (touches.length === 1) {
+            dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
+          }
+        },
+        onPanResponderMove: (evt) => {
+          const touches = evt.nativeEvent.touches;
+          if (touches.length >= 2 && pinchRef.current) {
+            const d = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
+            if (pinchRef.current.d > 0) {
+              engineRef.current.zoomAt(
+                (touches[0].locationX + touches[1].locationX) / 2,
+                (touches[0].locationY + touches[1].locationY) / 2,
+                d / pinchRef.current.d,
+              );
+            }
+            pinchRef.current.d = d;
+            engineRef.current.manual();
+          } else if (dragRef.current && touches.length === 1) {
+            const dx = touches[0].pageX - dragRef.current.x;
+            const dy = touches[0].pageY - dragRef.current.y;
+            engineRef.current.pan(dx, dy);
+            dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
+            engineRef.current.manual();
+          }
+        },
+        onPanResponderRelease: endGesture,
+        onPanResponderTerminate: endGesture,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  function endGesture() {
+    dragRef.current = null;
+    pinchRef.current = null;
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => {
+      const px = engineRef.current.settleZoom();
+      if (px) setCellPxState(px);
+    }, 250);
+  }
+
   // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
   void nowTick;
 
@@ -178,13 +293,13 @@ export default function MazeGameScreen() {
         onPickDifficulty={pickDifficulty}
         onPressSeed={() => { /* T16：打开种子面板 */ }}
       />
-      <View style={styles.viewport} onLayout={onLayout}>
+      <View style={styles.viewport} onLayout={onLayout} {...gesture.panHandlers}>
         {viewport.width > 0 && (
           <View ref={containerRef} style={styles.world}>
-            <MazeSvg maze={maze} palette={palette} cellPx={BASE_CELL_DP} />
+            <MazeSvg maze={maze} palette={palette} cellPx={cellPxState} />
             <TrailLayer
               maze={maze}
-              cellPx={BASE_CELL_DP}
+              cellPx={cellPxState}
               palette={palette}
               trailStyle={trailStyle}
               trail={trailSnapshot}
@@ -194,6 +309,19 @@ export default function MazeGameScreen() {
           </View>
         )}
         <BallView ref={ballRef} />
+        <Minimap
+          maze={maze}
+          palette={palette}
+          trail={trailSnapshot}
+          ballWorld={miniSnap.ball}
+          viewportWorld={miniSnap.view}
+          onJump={(gx, gy) => engineRef.current.jumpTo(gx * 2 + 0.5, gy * 2 + 0.5)}
+        />
+        {hint !== '' && (
+          <View style={styles.hintWrap} pointerEvents="none">
+            <Text style={styles.hintText}>{hint}</Text>
+          </View>
+        )}
       </View>
       <View style={[styles.bottom, { backgroundColor: palette.bg }]}>
         <Joystick
@@ -218,6 +346,16 @@ export default function MazeGameScreen() {
             <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>
               {TRAIL_STYLE_LABEL[trailStyle]}
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
+            onPress={() => engineRef.current.followBall()}>
+            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>🎯 跟球</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
+            onPress={showHint}>
+            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>💡 提示</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -249,4 +387,14 @@ const styles = StyleSheet.create({
   gbtn: { flexGrow: 1, flexBasis: '45%', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   gbtnTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
   gbtnText: { fontSize: 14, fontWeight: '600' },
+  hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center' },
+  hintText: {
+    backgroundColor: 'rgba(50,40,90,0.92)',
+    color: '#fff',
+    fontSize: 12.5,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
 });

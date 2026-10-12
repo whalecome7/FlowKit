@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { View } from 'react-native';
-import { BALL_R, BASE_CELL_DP, END_TOL, JOY_DEAD, SPEED } from '../constants';
+import { BALL_R, END_TOL, JOY_DEAD, MAX_SCALE_DP, MIN_SCALE_DP, SPEED } from '../constants';
 import { moveBall } from '../services/collision';
 import type { BallPos, CellPoint, JoyVector, MazeData } from '../types';
 
@@ -20,6 +20,8 @@ export interface EngineOptions {
   resetToken: number;
   /** 镜头：相对基准格的缩放倍数（Task 15 会由此 hook 接管计算） */
   camScaleRef: React.MutableRefObject<number>;
+  /** MazeSvg 当前绘制单元尺寸（澄清缩放后由屏幕更新） */
+  cellPxRef: React.MutableRefObject<number>;
 }
 
 /**
@@ -29,7 +31,7 @@ export interface EngineOptions {
  * - 容器平移直写（镜头跟随，Task 15 完善手动模式）
  */
 export function useGameEngine(opts: EngineOptions) {
-  const { maze, joyRef, ballViewRef, containerRef, viewport, resetToken, camScaleRef } = opts;
+  const { maze, joyRef, ballViewRef, containerRef, viewport, resetToken, camScaleRef, cellPxRef } = opts;
   const cbRef = useRef(opts);
   cbRef.current = opts;
 
@@ -38,6 +40,8 @@ export function useGameEngine(opts: EngineOptions) {
   const phaseRef = useRef<'ready' | 'playing' | 'won'>('ready');
   const startTimeRef = useRef(0);
   const cam = useRef({ x: maze.G / 2, y: maze.G / 2 });
+  const followRef = useRef(true);
+  const followHoldRef = useRef(0);
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
   // 终点世界坐标（每渲染重算；tick 闭包随 effect 依赖 maze 重建）
@@ -50,7 +54,7 @@ export function useGameEngine(opts: EngineOptions) {
   /** 世界坐标 → 屏幕坐标（小球不经容器变换，直接换算） */
   function worldToScreen(x: number, y: number): { sx: number; sy: number } {
     const s = camScale();
-    const k = BASE_CELL_DP * s;
+    const k = cellPxRef.current * s;
     return {
       sx: (x - cam.current.x) * k + viewport.width / 2,
       sy: (y - cam.current.y) * k + viewport.height / 2,
@@ -61,7 +65,7 @@ export function useGameEngine(opts: EngineOptions) {
     const v = ballViewRef.current;
     if (!v) return;
     const { sx, sy } = worldToScreen(ball.current.x, ball.current.y);
-    const d = BALL_R * 2 * BASE_CELL_DP * camScale();
+    const d = BALL_R * 2 * cellPxRef.current * camScale();
     v.setNativeProps({
       style: {
         width: d,
@@ -78,12 +82,80 @@ export function useGameEngine(opts: EngineOptions) {
     const s = camScale();
     // RN transform 围绕元素中心缩放：先居中平移（与 s 无关），
     // 再按 s 反向补偿镜头中心相对元素中心的偏移
-    const size = maze.G * BASE_CELL_DP;
-    const tx = viewport.width / 2 - size / 2 - s * (cam.current.x * BASE_CELL_DP - size / 2);
-    const ty = viewport.height / 2 - size / 2 - s * (cam.current.y * BASE_CELL_DP - size / 2);
+    const size = maze.G * cellPxRef.current;
+    const tx = viewport.width / 2 - size / 2 - s * (cam.current.x * cellPxRef.current - size / 2);
+    const ty = viewport.height / 2 - size / 2 - s * (cam.current.y * cellPxRef.current - size / 2);
     v.setNativeProps({
       style: { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] },
     });
+  }
+
+  /** 手动操作：暂停跟随 */
+  function manual() {
+    followRef.current = false;
+    followHoldRef.current = 2;
+  }
+
+  /** 回到跟随模式 */
+  function followBall() {
+    followRef.current = true;
+    followHoldRef.current = 0;
+  }
+
+  /** 屏幕坐标平移镜头（dxScreen/dyScreen 为本次手势的位移） */
+  function pan(dxScreen: number, dyScreen: number) {
+    const k = cellPxRef.current * camScale();
+    cam.current.x -= dxScreen / k;
+    cam.current.y -= dyScreen / k;
+    clampCam();
+    writeContainer();
+    writeBall();
+  }
+
+  /** 以屏幕点为锚缩放（factor 为本次增量倍率） */
+  function zoomAt(sx: number, sy: number, factor: number) {
+    const s0 = camScale();
+    const s1 = Math.max(
+      MIN_SCALE_DP / cellPxRef.current,
+      Math.min(MAX_SCALE_DP / cellPxRef.current, s0 * factor),
+    );
+    const k0 = cellPxRef.current * s0;
+    const wx = cam.current.x + (sx - viewport.width / 2) / k0;
+    const wy = cam.current.y + (sy - viewport.height / 2) / k0;
+    camScaleRef.current = s1;
+    const k1 = cellPxRef.current * s1;
+    cam.current.x = wx - (sx - viewport.width / 2) / k1;
+    cam.current.y = wy - (sy - viewport.height / 2) / k1;
+    clampCam();
+    writeContainer();
+    writeBall();
+  }
+
+  function clampCam() {
+    const k = cellPxRef.current * camScale();
+    const wW = viewport.width / k;
+    const wH = viewport.height / k;
+    cam.current.x = maze.G <= wW ? maze.G / 2 : Math.max(wW / 2, Math.min(maze.G - wW / 2, cam.current.x));
+    cam.current.y = maze.G <= wH ? maze.G / 2 : Math.max(wH / 2, Math.min(maze.G - wH / 2, cam.current.y));
+  }
+
+  /** 缩放澄清：把手势缩放固化进绘制尺寸（避免位图放大模糊）。返回值即新的 cellPx（无变化返回 null） */
+  function settleZoom(): number | null {
+    const s = camScale();
+    if (Math.abs(s - 1) < 0.12) return null;
+    const targetPx = Math.round(cellPxRef.current * s * 4) / 4;
+    camScaleRef.current = 1;
+    return targetPx;
+  }
+
+  /** 镜头跳转到世界坐标（缩略图点击） */
+  function jumpTo(wx: number, wy: number): void {
+    cam.current.x = wx;
+    cam.current.y = wy;
+    clampCam();
+    manual();
+    writeContainer();
+    writeBall();
   }
 
   function reset() {
@@ -95,15 +167,18 @@ export function useGameEngine(opts: EngineOptions) {
     startTimeRef.current = 0;
     cam.current.x = maze.G / 2;
     cam.current.y = maze.G / 2;
+    followRef.current = true;
+    followHoldRef.current = 0;
     writeBall();
     writeContainer();
   }
 
-  /** 跟随镜头：死区 30%，出界平滑追踪（手动模式的接管在 Task 15） */
+  /** 跟随镜头：死区 30%，出界平滑追踪；手动模式接管与回跟随见 followRef */
   function updateCamera(dt: number) {
+    if (followHoldRef.current > 0) followHoldRef.current -= dt;
     const s = camScale();
-    const wW = viewport.width / (BASE_CELL_DP * s);
-    const wH = viewport.height / (BASE_CELL_DP * s);
+    const wW = viewport.width / (cellPxRef.current * s);
+    const wH = viewport.height / (cellPxRef.current * s);
     if (maze.G <= wW && maze.G <= wH) {
       cam.current.x = maze.G / 2;
       cam.current.y = maze.G / 2;
@@ -113,20 +188,21 @@ export function useGameEngine(opts: EngineOptions) {
     const dy = ball.current.y - cam.current.y;
     const deadX = wW * 0.3;
     const deadY = wH * 0.3;
+    const moving = Math.abs(joyRef.current.x) + Math.abs(joyRef.current.y) > 0.05;
+    if (!followRef.current && followHoldRef.current <= 0 && moving && (Math.abs(dx) > deadX || Math.abs(dy) > deadY)) {
+      followRef.current = true;
+    }
+    if (!followRef.current) return;
     let tx = cam.current.x;
     let ty = cam.current.y;
     if (dx > deadX) tx = ball.current.x - deadX;
     if (dx < -deadX) tx = ball.current.x + deadX;
     if (dy > deadY) ty = ball.current.y - deadY;
     if (dy < -deadY) ty = ball.current.y + deadY;
-    const k = Math.min(1, dt * 7);
-    cam.current.x += (tx - cam.current.x) * k;
-    cam.current.y += (ty - cam.current.y) * k;
-    // 镜头不越出迷宫
-    const halfW = wW / 2;
-    const halfH = wH / 2;
-    cam.current.x = Math.max(halfW, Math.min(maze.G - halfW, cam.current.x));
-    cam.current.y = Math.max(halfH, Math.min(maze.G - halfH, cam.current.y));
+    const f = Math.min(1, dt * 7);
+    cam.current.x += (tx - cam.current.x) * f;
+    cam.current.y += (ty - cam.current.y) * f;
+    clampCam();
   }
 
   useEffect(() => {
@@ -185,5 +261,12 @@ export function useGameEngine(opts: EngineOptions) {
     /** 供外部读取当前球位置（幽灵/缩略图） */
     getBall: () => ball.current,
     getCam: () => cam.current,
+    manual,
+    followBall,
+    pan,
+    zoomAt,
+    settleZoom,
+    jumpTo,
+    getCamScale: camScale,
   };
 }

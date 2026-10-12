@@ -1,4 +1,4 @@
-import { generateMaze, braidMaze, countDeadEnds } from './generator';
+import { generateMaze, braidMaze, countDeadEnds, findShortestPath } from './generator';
 import { DIFF_ORDER } from '../constants';
 import type { MazeData, CellPoint } from '../types';
 
@@ -76,6 +76,20 @@ describe('generateMaze', () => {
     braidMaze(copy, m.inS, m.G, mulberry32Lite(42), 0.85);
     const after = countDeadEnds(copy, m.inS, m.G);
     expect(after).toBeLessThan(before * 0.35);
+  });
+});
+
+describe('findShortestPath', () => {
+  it('返回含首尾的连续格路径', () => {
+    const m = generateMaze(1234567, 'normal');
+    const path = findShortestPath(m, m.start, m.end);
+    expect(path).not.toBeNull();
+    expect(path![0]).toEqual(m.start);
+    expect(path![path!.length - 1]).toEqual(m.end);
+    for (let n = 1; n < path!.length; n++) {
+      const d = Math.abs(path![n][0] - path![n - 1][0]) + Math.abs(path![n][1] - path![n - 1][1]);
+      expect(d).toBe(1);
+    }
   });
 });
 

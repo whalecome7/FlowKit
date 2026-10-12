@@ -208,3 +208,45 @@ export function generateMaze(seed: number, difficulty: MazeDifficulty): MazeData
   const b = bfsFarthest(cells, N, a);
   return { seed, difficulty, N, G, shapeKey, cells, inS, start: a, end: b };
 }
+
+/** 格坐标 BFS 最短路；无路径返回 null */
+export function findShortestPath(maze: MazeData, from: CellPoint, to: CellPoint): CellPoint[] | null {
+  const keyOf = (i: number, j: number) => i + ',' + j;
+  const seen = new Set<string>([keyOf(from[0], from[1])]);
+  const q: CellPoint[] = [from];
+  const prev: Record<string, CellPoint> = {};
+  const dirs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  let found = false;
+  while (q.length) {
+    const cur = q.shift()!;
+    if (cur[0] === to[0] && cur[1] === to[1]) {
+      found = true;
+      break;
+    }
+    for (const [di, dj] of dirs) {
+      const ni = cur[0] + di;
+      const nj = cur[1] + dj;
+      if (ni < 0 || nj < 0 || ni >= maze.N || nj >= maze.N) continue;
+      if (maze.cells[2 * nj + 1][2 * ni + 1] !== 0) continue;
+      if (maze.cells[2 * cur[1] + 1 + dj][2 * cur[0] + 1 + di] !== 0) continue;
+      const k = keyOf(ni, nj);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      prev[k] = cur;
+      q.push([ni, nj]);
+    }
+  }
+  if (!found) return null;
+  const path: CellPoint[] = [];
+  let node: CellPoint | undefined = [to[0], to[1]];
+  while (node) {
+    path.unshift(node);
+    node = prev[keyOf(node[0], node[1])];
+  }
+  return path;
+}

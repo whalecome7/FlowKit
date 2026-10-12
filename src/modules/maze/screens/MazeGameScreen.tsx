@@ -1,21 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../../theme';
-import { BASE_CELL_DP, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
+import { BASE_CELL_DP, DIFFS, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import Minimap from '../components/Minimap';
 import TrailLayer from '../components/TrailLayer';
 import HudBar from '../components/HudBar';
 import Joystick from '../components/Joystick';
-import { SeedModal, WinModal } from '../components/GameModals';
+import { SeedModal, ViewBanner, WinModal } from '../components/GameModals';
 import { useGameEngine } from '../hooks/useGameEngine';
 import { findShortestPath, generateMaze } from '../services/generator';
 import { addHistoryRecord, loadBest, upsertBest } from '../services/storage';
-import { encodeTrail } from '../services/trailCodec';
+import { decodeTrail, encodeTrail } from '../services/trailCodec';
 import { useMazeStore } from '../store';
-import type { CellPoint, JoyVector, MazeDifficulty } from '../types';
+import type { MazeStackParamList } from './MazeHistoryScreen';
+import type { CellPoint, HistoryRecord, JoyVector, MazeDifficulty } from '../types';
 
 function randSeed(): number {
   return 1000000 + Math.floor(Math.random() * 9000000);
@@ -53,6 +57,20 @@ export default function MazeGameScreen() {
   const maze = useMemo(() => generateMaze(seed, difficulty), [seed, difficulty]);
   const palette = useMemo(() => paletteForSeed(seed), [seed]);
 
+  const navigation = useNavigation<NativeStackNavigationProp<MazeStackParamList>>();
+  const route = useRoute<RouteProp<MazeStackParamList, 'MazeGame'>>();
+  const viewRecord = route.params?.viewRecord ?? null;
+  const [viewingRecord, setViewingRecord] = useState<HistoryRecord | null>(null);
+  const [showShortest, setShowShortest] = useState(false);
+  const ghost = useMemo(
+    () => (viewingRecord ? decodeTrail(viewingRecord.trail) : null),
+    [viewingRecord],
+  );
+  const shortestPath = useMemo(
+    () => (showShortest ? findShortestPath(maze, maze.start, maze.end) : null),
+    [showShortest, maze],
+  );
+
   useEffect(() => {
     loadBest().then(setBest);
   }, [setBest]);
@@ -62,6 +80,17 @@ export default function MazeGameScreen() {
   useEffect(() => {
     useMazeStore.getState().resetGame();
   }, []);
+
+  // 路由参数播种查看模式：须声明在挂载 resetGame effect 之后（先清场后播种），
+  // difficulty/seed 变更会驱动 maze 重建，引擎随 [maze] 依赖自动回到起点
+  useEffect(() => {
+    if (!viewRecord) return;
+    useMazeStore.getState().setDifficulty(viewRecord.difficulty);
+    useMazeStore.getState().setSeed(viewRecord.seed);
+    useMazeStore.getState().resetGame();
+    setViewingRecord(viewRecord);
+    setShowShortest(false);
+  }, [viewRecord]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -333,8 +362,8 @@ export default function MazeGameScreen() {
               palette={palette}
               trailStyle={trailStyle}
               trail={trailSnapshot}
-              ghost={null}
-              shortestPath={null}
+              ghost={ghost}
+              shortestPath={shortestPath}
             />
           </View>
         )}
@@ -345,6 +374,26 @@ export default function MazeGameScreen() {
           ballWorld={miniSnap.ball}
           viewportWorld={miniSnap.view}
           onJump={(gx, gy) => engineRef.current.jumpTo(gx * 2 + 0.5, gy * 2 + 0.5)}
+        />
+        <ViewBanner
+          visible={viewingRecord !== null}
+          text={
+            viewingRecord
+              ? `🔍 历史迷宫 · ${DIFFS[viewingRecord.difficulty].label} · 当年 ${fmtTime(viewingRecord.timeMs)} / ${viewingRecord.steps} 步`
+              : ''
+          }
+          pathShown={showShortest}
+          palette={palette}
+          onTogglePath={() => setShowShortest((v) => !v)}
+          onRechallenge={() => {
+            setViewingRecord(null);
+            setShowShortest(false);
+            resetAndBump();
+          }}
+          onClose={() => {
+            setViewingRecord(null);
+            setShowShortest(false);
+          }}
         />
         {hint !== '' && (
           <View style={styles.hintWrap} pointerEvents="none">
@@ -375,6 +424,11 @@ export default function MazeGameScreen() {
             <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>
               {TRAIL_STYLE_LABEL[trailStyle]}
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
+            onPress={() => navigation.navigate('MazeHistory')}>
+            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>📜 历史</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}

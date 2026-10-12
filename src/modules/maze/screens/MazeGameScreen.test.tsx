@@ -9,6 +9,12 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest'),
 );
 
+// 屏幕依赖 useNavigation/useRoute（T17 历史查看模式）；本测试不包裹 NavigationContainer，按最小面 mock
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: jest.fn() }),
+  useRoute: () => ({ params: undefined }),
+}));
+
 describe('MazeGameScreen', () => {
   beforeEach(() => {
     useMazeStore.setState(useMazeStore.getInitialState(), true);

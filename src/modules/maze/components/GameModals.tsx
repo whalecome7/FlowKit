@@ -73,7 +73,9 @@ export function SeedModal({ visible, seed, palette, onClose, onGenerate }: SeedM
             <TouchableOpacity
               style={[styles.btn, { backgroundColor: colors.surfaceAlt }]}
               onPress={() => {
-                void Share.share({ message: `迷境迷宫种子：${seed}` });
+                void Share.share({ message: `迷境迷宫种子：${seed}` }).catch(() => {
+                  // 分享失败静默
+                });
               }}>
               <Text style={[styles.btnText, { color: colors.text }]}>分享</Text>
             </TouchableOpacity>
@@ -93,6 +95,38 @@ export function SeedModal({ visible, seed, palette, onClose, onGenerate }: SeedM
         </View>
       </View>
     </Modal>
+  );
+}
+
+interface ViewBannerProps {
+  visible: boolean;
+  text: string;
+  pathShown: boolean;
+  palette: Palette;
+  onTogglePath: () => void;
+  onRechallenge: () => void;
+  onClose: () => void;
+}
+
+export function ViewBanner({ visible, text, pathShown, palette, onTogglePath, onRechallenge, onClose }: ViewBannerProps) {
+  if (!visible) return null;
+  return (
+    <View style={styles.banner}>
+      <Text style={styles.bannerText}>{text}</Text>
+      <View style={styles.bannerRow}>
+        <TouchableOpacity style={styles.bannerBtn} onPress={onTogglePath}>
+          <Text style={styles.bannerBtnText}>{pathShown ? '🙈 隐藏路径' : '📏 最短路径'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bannerBtn, { backgroundColor: palette.wallDark }]}
+          onPress={onRechallenge}>
+          <Text style={styles.bannerBtnText}>重新挑战</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.bannerBtn} onPress={onClose}>
+          <Text style={styles.bannerBtnText}>关闭</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -116,4 +150,27 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   fullBtn: { marginTop: 10 },
+  banner: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 10,
+    backgroundColor: 'rgba(255,248,225,0.96)',
+    borderColor: '#f2ddab',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    zIndex: 20,
+  },
+  bannerText: { color: '#7a5c10', fontSize: 12 },
+  bannerRow: { flexDirection: 'row', gap: 6 },
+  bannerBtn: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#7a5c10',
+    borderRadius: 8,
+    paddingVertical: 6,
+  },
+  bannerBtnText: { color: '#fff', fontSize: 11, fontWeight: '600' },
 });

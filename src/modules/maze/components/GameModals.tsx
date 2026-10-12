@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../../theme';
 import type { Palette } from '../constants';
 
@@ -38,6 +38,64 @@ export function WinModal({ visible, timeText, steps, bestText, palette, onAgain,
   );
 }
 
+interface SeedModalProps {
+  visible: boolean;
+  seed: number;
+  palette: Palette;
+  onClose: () => void;
+  onGenerate: (seed: number) => void;
+}
+
+export function SeedModal({ visible, seed, palette, onClose, onGenerate }: SeedModalProps) {
+  const { colors } = useTheme();
+  const [input, setInput] = React.useState(String(seed));
+  React.useEffect(() => {
+    if (visible) setInput(String(seed));
+  }, [visible, seed]);
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.mask}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.title, { color: colors.text }]}>🌱 随机种子</Text>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            keyboardType="number-pad"
+            maxLength={8}
+            style={[styles.seedInput, { color: colors.text, borderColor: colors.border }]}
+          />
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.surfaceAlt }]}
+              onPress={() => setInput(String(1000000 + Math.floor(Math.random() * 9000000)))}>
+              <Text style={[styles.btnText, { color: colors.text }]}>随机</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.surfaceAlt }]}
+              onPress={() => {
+                void Share.share({ message: `迷境迷宫种子：${seed}` });
+              }}>
+              <Text style={[styles.btnText, { color: colors.text }]}>分享</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: palette.wall }]}
+              onPress={() => {
+                if (/^\d{6,8}$/.test(input)) onGenerate(parseInt(input, 10));
+              }}>
+              <Text style={[styles.btnText, { color: '#fff' }]}>生成</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[styles.btn, styles.fullBtn, { backgroundColor: colors.surfaceAlt }]}
+            onPress={onClose}>
+            <Text style={[styles.btnText, { color: colors.text }]}>取消</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   mask: { flex: 1, backgroundColor: 'rgba(35,28,60,0.38)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: { width: '100%', maxWidth: 320, borderRadius: 20, padding: 22 },
@@ -47,4 +105,15 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   btn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12 },
   btnText: { fontSize: 14, fontWeight: '600' },
+  seedInput: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 18,
+    textAlign: 'center',
+    letterSpacing: 2,
+    marginBottom: 14,
+    fontVariant: ['tabular-nums'],
+  },
+  fullBtn: { marginTop: 10 },
 });

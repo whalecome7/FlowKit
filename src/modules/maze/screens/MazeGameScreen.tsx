@@ -9,7 +9,7 @@ import Minimap from '../components/Minimap';
 import TrailLayer from '../components/TrailLayer';
 import HudBar from '../components/HudBar';
 import Joystick from '../components/Joystick';
-import { WinModal } from '../components/GameModals';
+import { SeedModal, WinModal } from '../components/GameModals';
 import { useGameEngine } from '../hooks/useGameEngine';
 import { findShortestPath, generateMaze } from '../services/generator';
 import { addHistoryRecord, loadBest, upsertBest } from '../services/storage';
@@ -48,6 +48,7 @@ export default function MazeGameScreen() {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [resetToken, setResetToken] = useState(0);
   const [nowTick, setNowTick] = useState(0);
+  const [seedModal, setSeedModal] = useState(false);
 
   const maze = useMemo(() => generateMaze(seed, difficulty), [seed, difficulty]);
   const palette = useMemo(() => paletteForSeed(seed), [seed]);
@@ -164,6 +165,7 @@ export default function MazeGameScreen() {
       clearTimeout(hintTimerRef.current);
       hintTimerRef.current = null;
     }
+    setHint('');
   }, [maze, resetToken]);
 
   // 卸载清理：清掉可能挂起的防抖/提示定时器
@@ -319,7 +321,7 @@ export default function MazeGameScreen() {
         bestText={bestText}
         palette={palette}
         onPickDifficulty={pickDifficulty}
-        onPressSeed={() => { /* T16：打开种子面板 */ }}
+        onPressSeed={() => setSeedModal(true)}
       />
       <View ref={viewportRef} style={styles.viewport} onLayout={onLayout} {...gesture.panHandlers}>
         {viewport.width > 0 && (
@@ -394,6 +396,17 @@ export default function MazeGameScreen() {
         palette={palette}
         onAgain={restart}
         onNewMaze={newMaze}
+      />
+      <SeedModal
+        visible={seedModal}
+        seed={seed}
+        palette={palette}
+        onClose={() => setSeedModal(false)}
+        onGenerate={(s) => {
+          setSeedModal(false);
+          setSeed(s);
+          resetAndBump();
+        }}
       />
     </View>
   );

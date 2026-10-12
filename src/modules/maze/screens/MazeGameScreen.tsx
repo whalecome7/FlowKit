@@ -119,14 +119,16 @@ export default function MazeGameScreen() {
       };
       void upsertBest(difficulty, { timeMs: ms, steps: stepsNow })
         .then((refreshed) => {
-          if (refreshed) loadBest().then(useMazeStore.getState().setBest);
+          if (refreshed) loadBest().then(useMazeStore.getState().setBest).catch(() => {});
         })
         .catch(() => {
           // 存储写入失败静默（不影响对局）
         });
       void addHistoryRecord(rec)
         .then(useMazeStore.getState().setHistory)
-        .catch(() => {});
+        .catch(() => {
+          // 存储写入失败静默（不影响对局）
+        });
     },
   });
 

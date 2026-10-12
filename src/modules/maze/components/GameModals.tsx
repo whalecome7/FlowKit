@@ -16,7 +16,7 @@ interface WinModalProps {
 export function WinModal({ visible, timeText, steps, bestText, palette, onAgain, onNewMaze }: WinModalProps) {
   const { colors } = useTheme();
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onAgain}>
       <View style={styles.mask}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.title, { color: colors.text }]}>🎉 通关！</Text>

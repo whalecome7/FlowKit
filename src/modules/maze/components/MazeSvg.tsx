@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
-import { FLAG_COLOR, FLAG_POLE_COLOR, START_COLOR, type Palette } from '../constants';
+import { FLAG_COLOR, FLAG_POLE_COLOR, START_COLOR, WALL_THICKNESS, type Palette } from '../constants';
 import type { MazeData } from '../types';
 
 interface Props {
@@ -16,10 +16,8 @@ function MazeSvgInner({ maze, palette, cellPx }: Props) {
 
   const wallRects = useMemo(() => {
     const grid = maze.G;
+    const t = cellPx * WALL_THICKNESS;
     const rects: React.ReactElement[] = [];
-    // 墙格：未打通（cells==1）且与形状房间 8 邻触达（含对角）。
-    // 含对角才能纳入转角/桥接墙格——正交相邻的可见墙单元实际不存在（实测行内 run 恒为 1 格），
-    // 补上它们墙面才能在行合并后连贯成整体，并与物理碰撞（cells==1）视觉一致
     const isWall = (r: number, c: number): boolean => {
       if (maze.cells[r][c] !== 1) return false;
       if (maze.inS[r][c]) return true;
@@ -27,15 +25,11 @@ function MazeSvgInner({ maze, palette, cellPx }: Props) {
         (r > 0 && maze.inS[r - 1][c]) ||
         (r < grid - 1 && maze.inS[r + 1][c]) ||
         (c > 0 && maze.inS[r][c - 1]) ||
-        (c < grid - 1 && maze.inS[r][c + 1]) ||
-        (r > 0 && c > 0 && maze.inS[r - 1][c - 1]) ||
-        (r > 0 && c < grid - 1 && maze.inS[r - 1][c + 1]) ||
-        (r < grid - 1 && c > 0 && maze.inS[r + 1][c - 1]) ||
-        (r < grid - 1 && c < grid - 1 && maze.inS[r + 1][c + 1])
+        (c < grid - 1 && maze.inS[r][c + 1])
       );
     };
-    // 按行合并连续墙段为无缝长条：墙面连贯成整体，且大幅减少 SVG 元素数量
-    for (let r = 0; r < grid; r++) {
+    // 水平墙线：偶数行（水平隔断带，含角位）按 run 合并为细长条（y 取行中心）
+    for (let r = 0; r < grid; r += 2) {
       let c = 0;
       while (c < grid) {
         if (!isWall(r, c)) {
@@ -46,15 +40,38 @@ function MazeSvgInner({ maze, palette, cellPx }: Props) {
         while (end < grid && isWall(r, end)) end++;
         rects.push(
           <Rect
-            key={`${r}-${c}`}
+            key={`h${r}-${c}`}
             x={c * cellPx}
-            y={r * cellPx}
-            width={(end - c) * cellPx + 0.5}
-            height={cellPx + 0.5}
+            y={(r + 0.5) * cellPx - t / 2}
+            width={(end - c) * cellPx}
+            height={t}
             fill={palette.wall}
           />,
         );
         c = end;
+      }
+    }
+    // 竖直墙线：偶数列（竖直隔断带，含角位）按 run 合并为细长条（x 取列中心）
+    for (let c = 0; c < grid; c += 2) {
+      let r = 0;
+      while (r < grid) {
+        if (!isWall(r, c)) {
+          r++;
+          continue;
+        }
+        let end = r;
+        while (end < grid && isWall(end, c)) end++;
+        rects.push(
+          <Rect
+            key={`v${c}-${r}`}
+            x={(c + 0.5) * cellPx - t / 2}
+            y={r * cellPx}
+            width={t}
+            height={(end - r) * cellPx}
+            fill={palette.wall}
+          />,
+        );
+        r = end;
       }
     }
     return rects;

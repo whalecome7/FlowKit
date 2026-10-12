@@ -1,5 +1,6 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
 import type { JoyVector } from '../types';
 
 interface Props {
@@ -11,17 +12,25 @@ interface Props {
 /** 自研摇杆：拖动旋钮输出归一化向量 [-1,1]（直写实现，不触发 React 渲染） */
 export default function Joystick({ onMove, size = 128 }: Props) {
   const knobRef = useRef<View>(null);
+  const baseRef = useRef<View>(null);
+  const originRef = useRef({ x: 0, y: 0 });
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const radius = size / 2 - 26;
+
+  const measure = useCallback(() => {
+    baseRef.current?.measureInWindow((x, y) => {
+      originRef.current = { x, y };
+    });
+  }, []);
 
   const responder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (evt) => handle(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-        onPanResponderMove: (evt) => handle(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
+        onPanResponderGrant: (evt) => handle(evt),
+        onPanResponderMove: (evt) => handle(evt),
         onPanResponderRelease: reset,
         onPanResponderTerminate: reset,
       }),
@@ -29,9 +38,11 @@ export default function Joystick({ onMove, size = 128 }: Props) {
     [],
   );
 
-  function handle(lx: number, ly: number) {
-    let dx = lx - size / 2;
-    let dy = ly - size / 2;
+  function handle(evt: GestureResponderEvent) {
+    const px = evt.nativeEvent.pageX;
+    const py = evt.nativeEvent.pageY;
+    let dx = px - originRef.current.x - size / 2;
+    let dy = py - originRef.current.y - size / 2;
     const mag = Math.hypot(dx, dy);
     if (mag > radius) {
       dx = (dx / mag) * radius;
@@ -51,6 +62,8 @@ export default function Joystick({ onMove, size = 128 }: Props) {
   return (
     <View
       testID="joy-base"
+      ref={baseRef}
+      onLayout={measure}
       style={[styles.base, { width: size, height: size, borderRadius: size / 2 }]}
       {...responder.panHandlers}>
       <View testID="joy-knob" ref={knobRef} style={styles.knob} />

@@ -73,6 +73,9 @@ export const GHOST_COLOR = 'rgba(120, 118, 140, 0.85)';
 export const PATH_COLOR = '#0d9488';
 export const BALL_COLOR = '#64748b';
 
+/** 墙体线厚度（单元比例，0~1）：墙单元内以中心为轴绘制细条带 */
+export const WALL_THICKNESS = 0.6;
+
 /** 存储键（对齐项目 @flowkit 前缀惯例） */
 export const STORAGE_BEST = '@flowkit:maze:best';
 export const STORAGE_HISTORY = '@flowkit:maze:history';

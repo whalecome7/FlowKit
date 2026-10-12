@@ -14,7 +14,7 @@ describe('MazeSvg', () => {
         <MazeSvg maze={maze} palette={PALETTES[0]} cellPx={12} />,
       );
     });
-    // 有墙块（行合并后矩形数为连续墙段数，>10 防止完全空渲染回归）
+    // 有墙线（水平/竖直墙带的 run 合并细条带矩形数，>10 防止完全空渲染回归）
     expect(tree.root.findAllByType(Rect).length).toBeGreaterThan(10);
     // 起点虚线环 + 终点柔光底（Circle）
     expect(tree.root.findAllByType(Circle).length).toBeGreaterThanOrEqual(2);

@@ -4,6 +4,12 @@ import type { GestureResponderEvent } from 'react-native';
 import Joystick from './Joystick';
 import type { JoyVector } from '../types';
 
+// jest 环境的 View.measureInWindow 是共享 mock（不回调）；测试中注入一次回调，
+// 模拟真机 onLayout 时测得的底座页面原点，使页坐标协议（pageX/Y - 原点）可被验证
+const MockNativeMethods = jest.requireActual<{
+  default: { measureInWindow: jest.Mock };
+}>('@react-native/jest-preset/jest/MockNativeMethods').default;
+
 describe('Joystick', () => {
   it('渲染底座与旋钮', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
@@ -89,6 +95,16 @@ describe('Joystick', () => {
     );
 
     // 默认 size=128 → 圆心 (64,64)、半径 radius=64-26=38
+    // 先经 onLayout 测量底座页面原点（= PAGE_OFFSET），手势事件页坐标即由该偏移构成
+    MockNativeMethods.measureInWindow.mockImplementationOnce((cb: (x: number, y: number, w: number, h: number) => void) =>
+      cb(PAGE_OFFSET, PAGE_OFFSET, 128, 128),
+    );
+    await ReactTestRenderer.act(() => {
+      base.props.onLayout({
+        nativeEvent: { layout: { x: 0, y: 0, width: 128, height: 128 } },
+      });
+    });
+
     await ReactTestRenderer.act(() => {
       // 按下在超界 100px 处（圆心 + (100,0)）
       base.props.onResponderGrant(makeResponderEvent(164, 64, 1));

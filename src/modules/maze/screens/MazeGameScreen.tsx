@@ -306,8 +306,22 @@ export default function MazeGameScreen() {
         onPanResponderMove: (evt) => {
           movedSinceGrantRef.current = true;
           const touches = evt.nativeEvent.touches;
-          if (touches.length >= 2 && pinchRef.current) {
-            const d = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
+          if (touches.length >= 2) {
+            if (!pinchRef.current) {
+              // 第二指刚落下：以当前两指距离为基准启动捏合，并中止拖动
+              pinchRef.current = {
+                d: Math.hypot(
+                  touches[0].pageX - touches[1].pageX,
+                  touches[0].pageY - touches[1].pageY,
+                ),
+              };
+              dragRef.current = null;
+              movedSinceGrantRef.current = true;
+            }
+            const d = Math.hypot(
+              touches[0].pageX - touches[1].pageX,
+              touches[0].pageY - touches[1].pageY,
+            );
             if (pinchRef.current.d > 0) {
               engineRef.current.zoomAt(
                 (touches[0].pageX + touches[1].pageX) / 2 - viewportOriginRef.current.x,
@@ -317,12 +331,20 @@ export default function MazeGameScreen() {
             }
             pinchRef.current.d = d;
             engineRef.current.manual();
-          } else if (dragRef.current && touches.length === 1) {
-            const dx = touches[0].pageX - dragRef.current.x;
-            const dy = touches[0].pageY - dragRef.current.y;
-            engineRef.current.pan(dx, dy);
-            dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
-            engineRef.current.manual();
+          } else if (touches.length === 1) {
+            if (pinchRef.current) {
+              // 松开一指回到单指：重置捏合，把剩余手指作为拖动起点
+              pinchRef.current = null;
+              dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
+              return;
+            }
+            if (dragRef.current) {
+              const dx = touches[0].pageX - dragRef.current.x;
+              const dy = touches[0].pageY - dragRef.current.y;
+              engineRef.current.pan(dx, dy);
+              dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
+              engineRef.current.manual();
+            }
           }
         },
         onPanResponderRelease: endGesture,
@@ -475,7 +497,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingVertical: 12,
   },
   btnGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

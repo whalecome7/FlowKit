@@ -85,7 +85,7 @@ export function crescentPolygon(): Polygon {
     pts.push([0.92 * Math.cos(rad(th)), 0.92 * Math.sin(rad(th))]);
   }
   for (let i = 0; i <= 40; i++) {
-    const b = 284 + ((436 - 284) * i) / 40;
+    const b = 284 - ((284 - 76) * i) / 40;
     pts.push([0.3 + 0.8 * Math.cos(rad(b)), 0.8 * Math.sin(rad(b))]);
   }
   return pts;

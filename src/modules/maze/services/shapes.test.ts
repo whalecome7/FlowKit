@@ -36,12 +36,15 @@ describe('形状库', () => {
     expect(pointInPolygon(0.55, 0.8, poly)).toBe(true);
   });
 
-  it('月牙：中心与左侧厚部在内、远处在外', () => {
+  it('月牙：中心被"咬掉"、厚部在内、右侧凹口在外', () => {
     const poly = shape('crescent');
-    // 原型几何（外弧 57.5°→302.5° + 内弧 284°→436° 围合）中心实心，原点位于多边形内部；
-    // 原"(0,0) 在外"断言与原型几何不相容，已按原型 ASCII 验证过的几何微调
-    expect(pointInPolygon(0, 0, poly)).toBe(true);
+    // 原点位于内圆（被咬掉的缺口）内部 → 不在月牙内
+    expect(pointInPolygon(0, 0, poly)).toBe(false);
+    // 左侧厚部在内
     expect(pointInPolygon(-0.6, 0, poly)).toBe(true);
+    // 右侧凹口区域（内圆内部）不在月牙内
+    expect(pointInPolygon(0.9, 0, poly)).toBe(false);
+    // 最右侧（内圆外缘之外）也不是月牙
     expect(pointInPolygon(1.3, 0, poly)).toBe(false);
   });
 

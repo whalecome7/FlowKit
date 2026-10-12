@@ -292,9 +292,13 @@ export function useGameEngine(opts: EngineOptions) {
       const active = state === 'active';
       const wasActive = appActiveRef.current;
       appActiveRef.current = active;
-      if (active && !wasActive && rafRef.current === 0) {
-        lastTsRef.current = 0; // 回前台重置时间基准，避免大 dt
-        rafRef.current = requestAnimationFrame(tickRef.current);
+      if (active && !wasActive) {
+        // 回前台无条件重置时间基准：即使 rAF 链仍排队（被冻结的首帧未到），
+        // 恢复首帧的 dt 也为 0，避免 33ms 钳制造成单帧跳步
+        lastTsRef.current = 0;
+        if (rafRef.current === 0) {
+          rafRef.current = requestAnimationFrame(tickRef.current);
+        }
       }
     });
     return () => sub.remove();

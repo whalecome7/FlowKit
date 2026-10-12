@@ -132,6 +132,14 @@ async function mountHarness(maze: MazeData, viewport = VIEWPORT) {
   return {
     env,
     getApi: () => api,
+    /** 手动卸载（从全局挂载列表移除，避免 afterEach 二次卸载） */
+    unmount: async () => {
+      const idx = mounted.indexOf(tree);
+      if (idx >= 0) mounted.splice(idx, 1);
+      await ReactTestRenderer.act(() => {
+        tree.unmount();
+      });
+    },
     rerender: async (vp = viewport, token = 0) => {
       await ReactTestRenderer.act(() => {
         tree.update(el(vp, token));
@@ -287,13 +295,15 @@ describe('useGameEngine 镜头', () => {
 
 describe('useGameEngine AppState 生命周期', () => {
   let appStateHandler: ((s: AppStateStatus) => void) | null = null;
+  let removeHandler: jest.Mock;
   let addSpy: jest.SpyInstance;
 
   beforeEach(() => {
     appStateHandler = null;
+    removeHandler = jest.fn();
     addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
       appStateHandler = handler;
-      return { remove: jest.fn() };
+      return { remove: removeHandler };
     });
   });
 
@@ -347,5 +357,80 @@ describe('useGameEngine AppState 生命周期', () => {
     await stepFrames(1);
     expect(Math.hypot(ball.x - p1.x, ball.y - p1.y)).toBeGreaterThan(0.1);
     expect(rafQueue.length).toBe(1);
+  });
+
+  it('重复 active 事件不叠加 rAF 链', async () => {
+    const maze = generateMaze(1234567, 'easy');
+    const { env, getApi } = await mountHarness(maze, VIEWPORT);
+    await stepFrames(1); // 建立时间基准，链运行中
+
+    // 切后台推进一帧：tick 早退清空队列
+    change('background');
+    await stepFrames(1);
+    expect(rafQueue.length).toBe(0);
+
+    // 回前台恢复单链
+    change('active');
+    expect(rafQueue.length).toBe(1);
+
+    // 重复 active：wasActive 已为 true，不应再排新帧叠加
+    change('active');
+    change('active');
+    expect(rafQueue.length).toBe(1);
+
+    // 推进后仍是单链，且球随摇杆正常移动（恢复首帧 dt=0，次帧 16ms 步进）
+    env.joyRef.current = openDirAtStart(maze);
+    const ball = getApi().getBall();
+    const p0 = { x: ball.x, y: ball.y };
+    await stepFrames(2);
+    expect(Math.hypot(ball.x - p0.x, ball.y - p0.y)).toBeGreaterThan(0.1);
+    expect(rafQueue.length).toBe(1);
+  });
+
+  it('inactive/background → active 循环后恢复单链', async () => {
+    const maze = generateMaze(1234567, 'easy');
+    const { env, getApi } = await mountHarness(maze, VIEWPORT);
+    await stepFrames(1); // 建立时间基准，链运行中
+    env.joyRef.current = openDirAtStart(maze);
+
+    // 循环 1：inactive（非活跃）→ 早退清空 → active 恢复单链
+    change('inactive');
+    await stepFrames(1);
+    expect(rafQueue.length).toBe(0);
+    change('active');
+    expect(rafQueue.length).toBe(1);
+
+    // 推进一帧：lastTs 重建为本帧 ts（此后若仅重启时重置，就留下大 dt 隐患）
+    await stepFrames(1);
+    expect(rafQueue.length).toBe(1);
+
+    // 循环 2：background 下不消费帧（rAF 回调冻结在队列，rafRef!==0）→ active
+    change('background');
+    expect(rafQueue.length).toBe(1);
+    change('active');
+    expect(rafQueue.length).toBe(1);
+
+    // 恢复首帧带 10s 时间跳跃：时间基准无条件重置 → dt=0，球不瞬移
+    // （若仅 rafRef===0 时重置，此处 lastTs 为上一帧 ts，dt 被钳到 33ms → 球跳约 0.36 世界单位）
+    const ball = getApi().getBall();
+    const p0 = { x: ball.x, y: ball.y };
+    await stepFrames(1, 10000);
+    expect(ball.x).toBe(p0.x);
+    expect(ball.y).toBe(p0.y);
+    expect(rafQueue.length).toBe(1);
+
+    // 后续 16ms 帧恢复正常步进
+    await stepFrames(1);
+    expect(Math.hypot(ball.x - p0.x, ball.y - p0.y)).toBeGreaterThan(0.1);
+    expect(rafQueue.length).toBe(1);
+  });
+
+  it('卸载时移除 AppState 监听', async () => {
+    const maze = generateMaze(1234567, 'easy');
+    const h = await mountHarness(maze, VIEWPORT);
+    expect(removeHandler).not.toHaveBeenCalled();
+
+    await h.unmount();
+    expect(removeHandler).toHaveBeenCalledTimes(1);
   });
 });

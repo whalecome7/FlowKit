@@ -9,7 +9,7 @@ export async function loadBest(): Promise<BestMap> {
     const raw = await AsyncStorage.getItem(STORAGE_BEST);
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return {};
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
     return parsed as BestMap;
   } catch {
     return {};
@@ -30,7 +30,7 @@ function isHistoryRecord(v: unknown): v is HistoryRecord {
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
   return (
-    typeof o.difficulty === 'string' &&
+    (o.difficulty === 'easy' || o.difficulty === 'normal' || o.difficulty === 'hard' || o.difficulty === 'hell') &&
     typeof o.seed === 'number' &&
     typeof o.timeMs === 'number' &&
     typeof o.steps === 'number' &&

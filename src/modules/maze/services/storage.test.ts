@@ -30,6 +30,10 @@ describe('最佳成绩', () => {
     expect(notRefreshed).toBe(false);
     const best = await loadBest();
     expect(best.easy).toEqual({ timeMs: 50000, steps: 90 });
+    // 时间相同不覆盖（严格更快才刷新）
+    const tied = await upsertBest('easy', { timeMs: 50000, steps: 88 });
+    expect(tied).toBe(false);
+    expect((await loadBest()).easy).toEqual({ timeMs: 50000, steps: 90 });
   });
 
   it('不同难度互不影响', async () => {
@@ -84,6 +88,24 @@ describe('历史记录', () => {
   it('损坏数据容错：返回空数组', async () => {
     await AsyncStorage.setItem(STORAGE_HISTORY, '{bad json');
     expect(await loadMazeHistory()).toEqual([]);
+  });
+
+  it('最佳成绩存储损坏（数组）不会导致后续写入丢失', async () => {
+    await AsyncStorage.setItem('@flowkit:maze:best', '[1,2,3]');
+    expect(await loadBest()).toEqual({});
+    const refreshed = await upsertBest('easy', { timeMs: 1000, steps: 5 });
+    expect(refreshed).toBe(true);
+    expect((await loadBest()).easy).toEqual({ timeMs: 1000, steps: 5 });
+  });
+
+  it('非法 difficulty 的脏条目被过滤', async () => {
+    await AsyncStorage.setItem(
+      STORAGE_HISTORY,
+      JSON.stringify([{ difficulty: 'xyz', seed: 1, timeMs: 1, steps: 1, at: 9, trail: 'AAAA' }, rec(3)]),
+    );
+    const list = await loadMazeHistory();
+    expect(list).toHaveLength(1);
+    expect(list[0].at).toBe(3);
   });
 
   it('脏条目被类型守卫过滤', async () => {

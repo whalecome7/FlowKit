@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useTheme } from '../../../theme';
-import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
+import { BASE_CELL_DP, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import Minimap from '../components/Minimap';
@@ -76,9 +76,15 @@ export default function MazeGameScreen() {
         : '00:00.0';
   const bestText = best[difficulty] ? fmtTime(best[difficulty]!.timeMs) : '--';
 
+  const viewportRef = useRef<View>(null);
+  const viewportOriginRef = useRef({ x: 0, y: 0 });
+
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setViewport({ width, height });
+    viewportRef.current?.measureInWindow((x, y) => {
+      viewportOriginRef.current = { x, y };
+    });
   };
 
   const ballRef = useRef<View>(null);
@@ -92,19 +98,13 @@ export default function MazeGameScreen() {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const pinchRef = useRef<{ d: number } | null>(null);
   const lastTapRef = useRef(0);
+  const movedSinceGrantRef = useRef(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [trailVersion, setTrailVersion] = useState(0);
   const trailRef = useRef<CellPoint[]>([[maze.start[0], maze.start[1]]]);
   // trailVersion 作为唯一依赖：ref 写入不触发渲染，需版本号驱动快照重建
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const trailSnapshot = useMemo(() => trailRef.current.slice(), [trailVersion]);
-
-  // 初始/澄清后镜头：小迷宫全览、大迷宫按初始单元尺寸（游戏循环接管后由引擎直写）
-  useEffect(() => {
-    if (viewport.width === 0) return;
-    const fitNew = Math.min(viewport.width, viewport.height) / (maze.G + 1.6);
-    camScaleRef.current = Math.max(fitNew, INITIAL_CELL_DP) / cellPxState;
-  }, [viewport.width, viewport.height, maze, cellPxState]);
 
   useEffect(() => {
     cellPxRef.current = cellPxState;
@@ -156,6 +156,14 @@ export default function MazeGameScreen() {
   useEffect(() => {
     trailRef.current = [[maze.start[0], maze.start[1]]];
     setTrailVersion((v) => v + 1);
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
   }, [maze, resetToken]);
 
   // 卸载清理：清掉可能挂起的防抖/提示定时器
@@ -173,7 +181,7 @@ export default function MazeGameScreen() {
       const b = engineRef.current.getBall();
       const c = engineRef.current.getCam();
       const k = cellPxRef.current * engineRef.current.getCamScale();
-      setMiniSnap({
+      const next = {
         ball: { x: b.x, y: b.y },
         view: {
           x: c.x - viewport.width / k / 2,
@@ -181,7 +189,17 @@ export default function MazeGameScreen() {
           w: viewport.width / k,
           h: viewport.height / k,
         },
-      });
+      };
+      setMiniSnap((prev) =>
+        Math.abs(prev.ball.x - next.ball.x) < 0.01 &&
+        Math.abs(prev.ball.y - next.ball.y) < 0.01 &&
+        Math.abs(prev.view.x - next.view.x) < 0.01 &&
+        Math.abs(prev.view.y - next.view.y) < 0.01 &&
+        Math.abs(prev.view.w - next.view.w) < 0.01 &&
+        Math.abs(prev.view.h - next.view.h) < 0.01
+          ? prev
+          : next,
+      );
     }, 150);
     return () => clearInterval(t);
   }, [viewport.width, viewport.height]);
@@ -212,7 +230,10 @@ export default function MazeGameScreen() {
     const path = findShortestPath(maze, from, maze.end);
     setHint(path && path.length > 1 ? `距终点还有 ${path.length - 1} 格路程` : '已经在终点啦');
     if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    hintTimerRef.current = setTimeout(() => setHint(''), 1800);
+    hintTimerRef.current = setTimeout(() => {
+      hintTimerRef.current = null;
+      setHint('');
+    }, 1800);
   };
 
   // 手势：单指平移 / 双指缩放 / 双击回跟随；手势结束后 250ms 澄清缩放
@@ -222,15 +243,21 @@ export default function MazeGameScreen() {
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (evt) => {
+          if (settleTimerRef.current) {
+            clearTimeout(settleTimerRef.current);
+            settleTimerRef.current = null;
+          }
           const now = Date.now();
-          if (now - lastTapRef.current < 300) {
+          if (now - lastTapRef.current < 300 && !movedSinceGrantRef.current) {
             engineRef.current.followBall();
             lastTapRef.current = 0;
             dragRef.current = null;
             pinchRef.current = null;
+            movedSinceGrantRef.current = false;
             return;
           }
           lastTapRef.current = now;
+          movedSinceGrantRef.current = false;
           const touches = evt.nativeEvent.touches;
           if (touches.length >= 2) {
             pinchRef.current = {
@@ -241,13 +268,14 @@ export default function MazeGameScreen() {
           }
         },
         onPanResponderMove: (evt) => {
+          movedSinceGrantRef.current = true;
           const touches = evt.nativeEvent.touches;
           if (touches.length >= 2 && pinchRef.current) {
             const d = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
             if (pinchRef.current.d > 0) {
               engineRef.current.zoomAt(
-                (touches[0].locationX + touches[1].locationX) / 2,
-                (touches[0].locationY + touches[1].locationY) / 2,
+                (touches[0].pageX + touches[1].pageX) / 2 - viewportOriginRef.current.x,
+                (touches[0].pageY + touches[1].pageY) / 2 - viewportOriginRef.current.y,
                 d / pinchRef.current.d,
               );
             }
@@ -264,7 +292,6 @@ export default function MazeGameScreen() {
         onPanResponderRelease: endGesture,
         onPanResponderTerminate: endGesture,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -273,6 +300,7 @@ export default function MazeGameScreen() {
     pinchRef.current = null;
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
     settleTimerRef.current = setTimeout(() => {
+      settleTimerRef.current = null;
       const px = engineRef.current.settleZoom();
       if (px) setCellPxState(px);
     }, 250);
@@ -293,7 +321,7 @@ export default function MazeGameScreen() {
         onPickDifficulty={pickDifficulty}
         onPressSeed={() => { /* T16：打开种子面板 */ }}
       />
-      <View style={styles.viewport} onLayout={onLayout} {...gesture.panHandlers}>
+      <View ref={viewportRef} style={styles.viewport} onLayout={onLayout} {...gesture.panHandlers}>
         {viewport.width > 0 && (
           <View ref={containerRef} style={styles.world}>
             <MazeSvg maze={maze} palette={palette} cellPx={cellPxState} />
@@ -311,7 +339,6 @@ export default function MazeGameScreen() {
         <BallView ref={ballRef} />
         <Minimap
           maze={maze}
-          palette={palette}
           trail={trailSnapshot}
           ballWorld={miniSnap.ball}
           viewportWorld={miniSnap.view}

@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Rect } from 'react-native-svg';
-import { START_COLOR, FLAG_COLOR, type Palette } from '../constants';
+import { START_COLOR, FLAG_COLOR } from '../constants';
 import type { CellPoint, MazeData } from '../types';
 
 interface Props {
   maze: MazeData;
-  palette: Palette;
   trail: CellPoint[];
   /** 小球世界坐标（低频采样） */
   ballWorld: { x: number; y: number };

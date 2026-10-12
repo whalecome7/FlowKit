@@ -1,6 +1,14 @@
 import { useEffect, useRef } from 'react';
 import type { View } from 'react-native';
-import { BALL_R, END_TOL, JOY_DEAD, MAX_SCALE_DP, MIN_SCALE_DP, SPEED } from '../constants';
+import {
+  BALL_R,
+  END_TOL,
+  INITIAL_CELL_DP,
+  JOY_DEAD,
+  MAX_SCALE_DP,
+  MIN_SCALE_DP,
+  SPEED,
+} from '../constants';
 import { moveBall } from '../services/collision';
 import type { BallPos, CellPoint, JoyVector, MazeData } from '../types';
 
@@ -158,7 +166,14 @@ export function useGameEngine(opts: EngineOptions) {
     writeBall();
   }
 
+  /** 初始/重布局缩放：小迷宫全览、大迷宫按初始单元下限 */
+  function computeFitScale(): number {
+    const fit = Math.min(viewport.width, viewport.height) / (maze.G + 1.6);
+    return Math.max(fit, INITIAL_CELL_DP) / cellPxRef.current;
+  }
+
   function reset() {
+    camScaleRef.current = computeFitScale();
     // 原地更新：保证 getBall/getCam 已流出的引用不失效（调用方可能缓存）
     ball.current.x = 2 * maze.start[0] + 1.5;
     ball.current.y = 2 * maze.start[1] + 1.5;
@@ -210,9 +225,10 @@ export function useGameEngine(opts: EngineOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maze, resetToken]);
 
-  // 视口尺寸变化（旋转/分屏）：仅重新布局，不重置对局
+  // 视口变化（旋转/分屏）：重算 fit 并重布局，不重置对局
   useEffect(() => {
     if (viewport.width <= 0) return;
+    camScaleRef.current = computeFitScale();
     writeBall();
     writeContainer();
     // eslint-disable-next-line react-hooks/exhaustive-deps

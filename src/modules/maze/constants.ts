@@ -80,5 +80,7 @@ export const HISTORY_LIMIT = 50;
 
 /** 镜头 */
 export const BASE_CELL_DP = 12; // Svg 基础单元尺寸（缩放围绕它做 transform）
+/** 初始视图的单元尺寸下限（dp）：低于它则进入跟随模式 */
+export const INITIAL_CELL_DP = 10;
 export const MIN_SCALE_DP = 4;
 export const MAX_SCALE_DP = 22;

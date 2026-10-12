@@ -14,7 +14,7 @@ describe('MazeGameScreen', () => {
     useMazeStore.setState(useMazeStore.getInitialState(), true);
   });
 
-  it('渲染难度 chips 与迷宫视图不崩溃', async () => {
+  it('渲染难度 chips 不崩溃', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { BASE_CELL_DP, paletteForSeed } from '../constants';
+import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed } from '../constants';
 import MazeSvg from '../components/MazeSvg';
 import HudBar from '../components/HudBar';
 import { generateMaze } from '../services/generator';
@@ -14,7 +14,7 @@ function randSeed(): number {
 }
 
 function fmtTime(ms: number): string {
-  const total = ms / 1000;
+  const total = Math.round(ms / 100) / 10; // 先量化到 0.1s，避免 59.95s 舍入出 "60.0"
   const m = Math.floor(total / 60);
   const s = total - m * 60;
   return `${String(m).padStart(2, '0')}:${s.toFixed(1).padStart(4, '0')}`;
@@ -45,9 +45,10 @@ export default function MazeGameScreen() {
   }, [setBest]);
 
   useEffect(() => {
+    if (phase !== 'playing') return;
     const timer = setInterval(() => setNowTick((v) => v + 1), 100);
     return () => clearInterval(timer);
-  }, []);
+  }, [phase]);
 
   const timeText =
     phase === 'won'
@@ -65,10 +66,12 @@ export default function MazeGameScreen() {
   // 初始镜头：小迷宫全览、大迷宫按基础尺寸（游戏循环接管后由引擎直写）
   const fit =
     viewport.width > 0 ? Math.min(viewport.width, viewport.height) / (maze.G + 1.6) : 12;
-  const scale = Math.max(fit, 10) / BASE_CELL_DP;
+  const scale = Math.max(fit, INITIAL_CELL_DP) / BASE_CELL_DP;
 
-  const offsetX = viewport.width / 2 - (maze.G / 2) * BASE_CELL_DP * scale;
-  const offsetY = viewport.height / 2 - (maze.G / 2) * BASE_CELL_DP * scale;
+  // RN transform 围绕元素中心缩放：居中平移与 scale 无关（T12 引擎接管后按同一定义直写）
+  const size = maze.G * BASE_CELL_DP;
+  const offsetX = viewport.width / 2 - size / 2;
+  const offsetY = viewport.height / 2 - size / 2;
 
   const pickDifficulty = (d: MazeDifficulty) => {
     if (d === difficulty) return;
@@ -78,6 +81,8 @@ export default function MazeGameScreen() {
     setResetToken((v) => v + 1);
   };
 
+  // resetToken：T12 引擎的"重启本局"信号（当前占位，接入后由引擎消费）
+  // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
   void resetToken;
   void nowTick;
 
@@ -91,7 +96,7 @@ export default function MazeGameScreen() {
         bestText={bestText}
         palette={palette}
         onPickDifficulty={pickDifficulty}
-        onPressSeed={() => {}}
+        onPressSeed={() => { /* T16：打开种子面板 */ }}
       />
       <View style={styles.viewport} onLayout={onLayout}>
         {viewport.width > 0 && (

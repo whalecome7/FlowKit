@@ -50,6 +50,12 @@ export default function MazeGameScreen() {
     loadBest().then(setBest);
   }, [setBest]);
 
+  // 挂载时同步 store（幂等）：防卸载重挂载后引擎为全新实例（ready）
+  // 而 store 残留 playing（幽灵计时）
+  useEffect(() => {
+    useMazeStore.getState().resetGame();
+  }, []);
+
   useEffect(() => {
     if (phase !== 'playing') return;
     const timer = setInterval(() => setNowTick((v) => v + 1), 100);
@@ -98,37 +104,37 @@ export default function MazeGameScreen() {
       useMazeStore.getState().addStep();
       setTrailVersion((v) => v + 1);
     },
-    onWin: (elapsedMs) => useMazeStore.getState().winGame(elapsedMs),
+    onWin: (ms) => useMazeStore.getState().winGame(ms),
   });
 
   useEffect(() => {
     trailRef.current = [[maze.start[0], maze.start[1]]];
     setTrailVersion((v) => v + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maze, resetToken]);
+
+  // 重开一局的统一入口：先归零 store，再 bump 引擎 resetToken
+  const resetAndBump = () => {
+    resetGame();
+    setResetToken((v) => v + 1);
+  };
 
   const pickDifficulty = (d: MazeDifficulty) => {
     if (d === difficulty) return;
     setDifficulty(d);
     setSeed(randSeed());
-    resetGame();
-    setResetToken((v) => v + 1);
+    resetAndBump();
   };
 
   const newMaze = () => {
     setSeed(randSeed());
-    resetGame();
-    setResetToken((v) => v + 1);
+    resetAndBump();
   };
 
-  const restart = () => {
-    resetGame();
-    setResetToken((v) => v + 1);
-  };
+  const restart = resetAndBump;
 
   // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
+  // trailVersion：轨迹层刷新信号（T14 的 TrailLayer 将消费）
   void nowTick;
-  // trailVersion：T14 轨迹层刷新信号（先触发屏幕重渲染，供轨迹层消费）
   void trailVersion;
 
   return (

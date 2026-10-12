@@ -40,6 +40,8 @@ export function useGameEngine(opts: EngineOptions) {
   const cam = useRef({ x: maze.G / 2, y: maze.G / 2 });
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
+  // 终点世界坐标（每渲染重算；tick 闭包随 effect 依赖 maze 重建）
+  const endPos = { x: 2 * maze.end[0] + 1.5, y: 2 * maze.end[1] + 1.5 };
 
   function camScale(): number {
     return camScaleRef.current;
@@ -85,11 +87,14 @@ export function useGameEngine(opts: EngineOptions) {
   }
 
   function reset() {
-    ball.current = { x: 2 * maze.start[0] + 1.5, y: 2 * maze.start[1] + 1.5 };
+    // 原地更新：保证 getBall/getCam 已流出的引用不失效（调用方可能缓存）
+    ball.current.x = 2 * maze.start[0] + 1.5;
+    ball.current.y = 2 * maze.start[1] + 1.5;
     curCell.current = [maze.start[0], maze.start[1]];
     phaseRef.current = 'ready';
     startTimeRef.current = 0;
-    cam.current = { x: maze.G / 2, y: maze.G / 2 };
+    cam.current.x = maze.G / 2;
+    cam.current.y = maze.G / 2;
     writeBall();
     writeContainer();
   }
@@ -127,7 +132,15 @@ export function useGameEngine(opts: EngineOptions) {
   useEffect(() => {
     reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maze, resetToken, viewport.width, viewport.height]);
+  }, [maze, resetToken]);
+
+  // 视口尺寸变化（旋转/分屏）：仅重新布局，不重置对局
+  useEffect(() => {
+    if (viewport.width <= 0) return;
+    writeBall();
+    writeContainer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport.width, viewport.height]);
 
   useEffect(() => {
     function tick(ts: number) {
@@ -152,8 +165,7 @@ export function useGameEngine(opts: EngineOptions) {
             curCell.current = [ci, cj];
             cbRef.current.onEnterCell([ci, cj]);
           }
-          const ec = { x: 2 * maze.end[0] + 1.5, y: 2 * maze.end[1] + 1.5 };
-          if (Math.hypot(ball.current.x - ec.x, ball.current.y - ec.y) < END_TOL) {
+          if (Math.hypot(ball.current.x - endPos.x, ball.current.y - endPos.y) < END_TOL) {
             phaseRef.current = 'won';
             cbRef.current.onWin(Date.now() - startTimeRef.current);
           }

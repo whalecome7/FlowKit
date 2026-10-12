@@ -7,6 +7,12 @@ describe('trailCodec', () => {
     expect(decodeTrail('')).toEqual([]);
   });
 
+  it('损坏输入安全返回空数组', () => {
+    expect(decodeTrail('zzzz')).toEqual([]);
+    expect(decodeTrail('!!!!')).toEqual([]);
+    expect(decodeTrail('AAAA')).toEqual([]);
+  });
+
   it('L 型 3 格：精确长度并往返一致', () => {
     // bits = 16(计数) + 8(i) + 8(j) + 2×2(方向) = 36 bit → 5 字节 → base64 8 字符
     const trail: CellPoint[] = [

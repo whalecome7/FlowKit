@@ -77,6 +77,10 @@ export function decodeTrail(s: string): CellPoint[] {
     return val;
   };
   const count = readN(16);
+  // 自洽校验：合法编码的位长恰为 32 + 2*(count-1)，字节数须恰好容纳且填充位 < 8；
+  // 不满足即为损坏输入，安全返回空数组
+  const needBits = 32 + 2 * (count - 1);
+  if (count < 1 || needBits > bytes.length * 8 || needBits + 8 <= bytes.length * 8) return [];
   const list: CellPoint[] = [[readN(8), readN(8)]];
   for (let n = 1; n < count; n++) {
     const d = readN(2);

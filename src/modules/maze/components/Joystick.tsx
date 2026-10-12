@@ -4,13 +4,15 @@ import type { JoyVector } from '../types';
 
 interface Props {
   onMove: (v: JoyVector) => void;
-  /** 底座直径，默认 128 */
+  /** 底座直径（建议保持默认 128；旋钮与半径按此尺寸设计） */
   size?: number;
 }
 
 /** 自研摇杆：拖动旋钮输出归一化向量 [-1,1]（直写实现，不触发 React 渲染） */
 export default function Joystick({ onMove, size = 128 }: Props) {
   const knobRef = useRef<View>(null);
+  const onMoveRef = useRef(onMove);
+  onMoveRef.current = onMove;
   const radius = size / 2 - 26;
 
   const responder = useMemo(
@@ -38,12 +40,12 @@ export default function Joystick({ onMove, size = 128 }: Props) {
     knobRef.current?.setNativeProps({
       style: { transform: [{ translateX: dx }, { translateY: dy }] },
     });
-    onMove({ x: dx / radius, y: dy / radius });
+    onMoveRef.current({ x: dx / radius, y: dy / radius });
   }
 
   function reset() {
     knobRef.current?.setNativeProps({ style: { transform: [{ translateX: 0 }, { translateY: 0 }] } });
-    onMove({ x: 0, y: 0 });
+    onMoveRef.current({ x: 0, y: 0 });
   }
 
   return (

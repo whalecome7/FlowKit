@@ -46,25 +46,26 @@ export default function HudBar({
           );
         })}
       </View>
+      {/* 统计行位于固定浅色底（palette.bg）上，文字用固定深色以保证任何主题下可读 */}
       <View style={styles.statsRow}>
         <TouchableOpacity onPress={onPressSeed} style={styles.stat}>
-          <Text style={[styles.statText, { color: colors.textSecondary }]}>
-            🌱 <Text style={{ color: colors.text }}>{seed}</Text>
+          <Text style={[styles.statText, { color: '#6d6885' }]}>
+            🌱 <Text style={{ color: '#37324e' }}>{seed}</Text>
           </Text>
         </TouchableOpacity>
         <View style={styles.stat}>
-          <Text style={[styles.statText, { color: colors.textSecondary }]}>
-            ⏱ <Text style={{ color: colors.text }}>{timeText}</Text>
+          <Text style={[styles.statText, { color: '#6d6885' }]}>
+            ⏱ <Text style={{ color: '#37324e' }}>{timeText}</Text>
           </Text>
         </View>
         <View style={styles.stat}>
-          <Text style={[styles.statText, { color: colors.textSecondary }]}>
-            👣 <Text style={{ color: colors.text }}>{steps}</Text>
+          <Text style={[styles.statText, { color: '#6d6885' }]}>
+            👣 <Text style={{ color: '#37324e' }}>{steps}</Text>
           </Text>
         </View>
         <View style={styles.stat}>
-          <Text style={[styles.statText, { color: colors.textSecondary }]}>
-            🏆 <Text style={{ color: colors.text }}>{bestText}</Text>
+          <Text style={[styles.statText, { color: '#6d6885' }]}>
+            🏆 <Text style={{ color: '#37324e' }}>{bestText}</Text>
           </Text>
         </View>
       </View>

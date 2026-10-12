@@ -3,13 +3,15 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useTheme } from '../../../theme';
 import { BASE_CELL_DP, INITIAL_CELL_DP, paletteForSeed } from '../constants';
+import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import HudBar from '../components/HudBar';
 import Joystick from '../components/Joystick';
+import { useGameEngine } from '../hooks/useGameEngine';
 import { generateMaze } from '../services/generator';
 import { loadBest } from '../services/storage';
 import { useMazeStore } from '../store';
-import type { JoyVector, MazeDifficulty } from '../types';
+import type { CellPoint, JoyVector, MazeDifficulty } from '../types';
 
 function randSeed(): number {
   return 1000000 + Math.floor(Math.random() * 9000000);
@@ -72,10 +74,38 @@ export default function MazeGameScreen() {
     viewport.width > 0 ? Math.min(viewport.width, viewport.height) / (maze.G + 1.6) : 12;
   const scale = Math.max(fit, INITIAL_CELL_DP) / BASE_CELL_DP;
 
-  // RN transform 围绕元素中心缩放：居中平移与 scale 无关（T12 引擎接管后按同一定义直写）
-  const size = maze.G * BASE_CELL_DP;
-  const offsetX = viewport.width / 2 - size / 2;
-  const offsetY = viewport.height / 2 - size / 2;
+  const ballRef = useRef<View>(null);
+  const containerRef = useRef<View>(null);
+  const camScaleRef = useRef(scale);
+  const [trailVersion, setTrailVersion] = useState(0);
+  const trailRef = useRef<CellPoint[]>([[maze.start[0], maze.start[1]]]);
+
+  useEffect(() => {
+    camScaleRef.current = scale;
+  }, [scale]);
+
+  useGameEngine({
+    maze,
+    joyRef,
+    ballViewRef: ballRef,
+    containerRef,
+    viewport,
+    resetToken,
+    camScaleRef,
+    onStart: () => useMazeStore.getState().startGame(Date.now()),
+    onEnterCell: (cell) => {
+      trailRef.current.push(cell);
+      useMazeStore.getState().addStep();
+      setTrailVersion((v) => v + 1);
+    },
+    onWin: (elapsedMs) => useMazeStore.getState().winGame(elapsedMs),
+  });
+
+  useEffect(() => {
+    trailRef.current = [[maze.start[0], maze.start[1]]];
+    setTrailVersion((v) => v + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maze, resetToken]);
 
   const pickDifficulty = (d: MazeDifficulty) => {
     if (d === difficulty) return;
@@ -96,10 +126,10 @@ export default function MazeGameScreen() {
     setResetToken((v) => v + 1);
   };
 
-  // resetToken：T12 引擎的"重启本局"信号（当前占位，接入后由引擎消费）
   // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
-  void resetToken;
   void nowTick;
+  // trailVersion：T14 轨迹层刷新信号（先触发屏幕重渲染，供轨迹层消费）
+  void trailVersion;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -115,14 +145,11 @@ export default function MazeGameScreen() {
       />
       <View style={styles.viewport} onLayout={onLayout}>
         {viewport.width > 0 && (
-          <View
-            style={[
-              styles.world,
-              { transform: [{ translateX: offsetX }, { translateY: offsetY }, { scale }] },
-            ]}>
+          <View ref={containerRef} style={styles.world}>
             <MazeSvg maze={maze} palette={palette} cellPx={BASE_CELL_DP} />
           </View>
         )}
+        <BallView ref={ballRef} />
       </View>
       <View style={[styles.bottom, { backgroundColor: palette.bg }]}>
         <Joystick

@@ -3,10 +3,10 @@ import ReactTestRenderer from 'react-test-renderer';
 import { Text } from 'react-native';
 import { ThemeProvider } from '../../../theme';
 import MazeGameScreen from './MazeGameScreen';
-import { generateMaze } from '../services/generator';
 import { useMazeStore } from '../store';
+import { LIVE_SLOTS } from '../services/liveTrail';
 import type { RegionApi } from '../hooks/useGameGestures';
-import type { CellPoint, HistoryRecord } from '../types';
+import type { HistoryRecord } from '../types';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest'),
@@ -83,10 +83,10 @@ async function stepFrames(n: number) {
   }
 }
 
-/** 与既有用例相同的 props 特征定位 React.memo(TrailLayerInner)（Minimap 有 trail 无 ghost） */
+/** 定位 React.memo(TrailLayerInner)（回顾层：有 ghost/cellPx；Minimap 有 trail 无 ghost） */
 function findTrailLayer(tree: ReactTestRenderer.ReactTestRenderer) {
   return tree.root
-    .findAll((n) => n.props.trail !== undefined && n.props.ghost !== undefined)
+    .findAll((n) => n.props.ghost !== undefined && n.props.cellPx !== undefined)
     .at(0)!;
 }
 
@@ -121,7 +121,7 @@ describe('MazeGameScreen', () => {
     });
   });
 
-  it('viewport 渲染实时轨迹尾巴线（trail-tail，恰一条）', async () => {
+  it('viewport 渲染实时轨迹层（段池槽位齐全，恰一组）', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
@@ -130,11 +130,21 @@ describe('MazeGameScreen', () => {
         </ThemeProvider>,
       );
     });
-    // 过滤 host 元素（View 复合组件与 host 层都会带 testID，只应恰有一条 host 尾巴线）
-    const tails = tree.root.findAll(
-      (n) => typeof n.type === 'string' && n.props.testID === 'trail-tail',
+    // 手动触发视口布局：viewport.width > 0 后轨迹层才随 world 容器渲染
+    const viewportNode = tree.root
+      .findAll((n) => typeof n.props.onLayout === 'function' && n.props.style?.overflow === 'hidden')
+      .at(0)!;
+    await ReactTestRenderer.act(() => {
+      viewportNode.props.onLayout({ nativeEvent: { layout: { width: 300, height: 500 } } });
+    });
+    // 过滤 host 元素（View 复合组件与 host 层都会带 testID，只应恰有一组段池）
+    const segs = tree.root.findAll(
+      (n) =>
+        typeof n.type === 'string' &&
+        typeof n.props.testID === 'string' &&
+        n.props.testID.startsWith('trail-seg-'),
     );
-    expect(tails).toHaveLength(1);
+    expect(segs).toHaveLength(LIVE_SLOTS);
     await ReactTestRenderer.act(() => {
       tree.unmount();
     });
@@ -168,9 +178,7 @@ describe('MazeGameScreen', () => {
       // 推进 30 帧让引擎真实跑 moveBall/onEnterCell，球移动出起步格产生轨迹
       await stepFrames(30);
 
-      // 引擎已真实驱出多格轨迹与步数
-      const playedTrail = findTrailLayer(tree).props.trail as CellPoint[];
-      expect(playedTrail.length).toBeGreaterThan(1);
+      // 引擎已真实跑出多步（onEnterCell 链路）
       expect(useMazeStore.getState().steps).toBeGreaterThan(0);
       // 松手停杆（模拟用户放手后去历史页）
       mockCapturedApi!.onJoystickVector({ x: 0, y: 0 });
@@ -192,11 +200,10 @@ describe('MazeGameScreen', () => {
       const state = useMazeStore.getState();
       expect(state.phase).toBe('ready');
       expect(state.steps).toBe(0);
-      // 核心断言（对 C1 敏感）：轨迹复位为仅含起点——缺 resetToken bump 时保留推杆产生的游玩轨迹
-      const { start } = generateMaze(seed, difficulty);
+      // 核心断言（对 C1 敏感）：对局复位——缺 resetToken bump 时保留推杆产生的步数
+      expect(state.steps).toBe(0);
+      // 回顾层 props：trail '' 解码为空数组 → 无幽灵 Path
       const trailLayerNode = findTrailLayer(tree);
-      expect(trailLayerNode.props.trail).toEqual([[start[0], start[1]]]);
-      // trail '' 解码为空数组 → 无幽灵 Path
       expect(trailLayerNode.props.ghost).toEqual([]);
       // 横幅可见（文本含「历史迷宫」）
       const texts = tree.root

@@ -1,7 +1,8 @@
-/* 轨迹尾巴线几何回归：
- * 端到端（真实 useGameEngine tick + 屏幕层同款 onTick 尾巴几何）随机行走，
- * 验证"球当前格中心 → 球"的实时尾巴直线永不穿墙（线心深穿阈值 0.05 单元）。
- * 背景：曾用"上一格中心"作锚点，球进入当前格的下方通道（格判定未切换）时会斜穿角位墙。
+/* 轨迹几何回归：端到端（真实 useGameEngine tick）随机行走，
+ * 屏幕层同款采样（services/liveTrail）产生"球真实路径折线"，
+ * 验证采样折线各段与末段（最后采样点→球）线心深穿 ≤ 0.05 单元内零穿墙。
+ * 背景：旧"格中心折线 + 直线尾巴"模型存在固有领先/落后（格边界步进）与斜穿墙角问题，
+ * 改为球路径采样后，几何正确性由本测试持续保障。
  */
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
@@ -11,7 +12,8 @@ import { generateMaze } from '../services/generator';
 import { BASE_CELL_DP } from '../constants';
 import { collidesRect } from '../services/collision';
 import { mulberry32 } from '../services/rng';
-import type { CellPoint, JoyVector, MazeData } from '../types';
+import { createLivePath, pushPoint } from '../services/liveTrail';
+import type { JoyVector, MazeData } from '../types';
 
 type EngineApi = ReturnType<typeof useGameEngine>;
 type RafCb = (ts: number) => void;
@@ -23,7 +25,7 @@ let env: {
 };
 let api: EngineApi | null = null;
 
-function Harness(props: { maze: MazeData; onEnterCell: (c: CellPoint) => void; onTick: () => void }) {
+function Harness(props: { maze: MazeData; onTick: () => void }) {
   const view = { setNativeProps: jest.fn() } as unknown as View;
   api = useGameEngine({
     maze: props.maze,
@@ -35,7 +37,7 @@ function Harness(props: { maze: MazeData; onEnterCell: (c: CellPoint) => void; o
     camScaleRef: env.camScaleRef,
     cellPxRef: env.cellPxRef,
     onStart: () => {},
-    onEnterCell: props.onEnterCell,
+    onEnterCell: () => {},
     onWin: () => {},
     onTick: props.onTick,
   });
@@ -101,38 +103,34 @@ function segDeepWall(maze: MazeData, x0: number, y0: number, x1: number, y1: num
   return maxRun;
 }
 
-describe('轨迹尾巴线几何', () => {
-  it('随机行走 1500 帧：当前格中心→球的尾巴直线零穿墙', async () => {
+describe('轨迹几何：球真实路径采样', () => {
+  it('随机行走 1500 帧：采样折线与末段（最后采样点→球）零穿墙', async () => {
     env = {
       joyRef: { current: { x: 0, y: 0 } },
       camScaleRef: { current: 1 },
       cellPxRef: { current: BASE_CELL_DP },
     };
     const maze = generateMaze(1000000, 'easy');
-    const trail: CellPoint[] = [[maze.start[0], maze.start[1]]];
+    const state = createLivePath(2 * maze.start[0] + 1.5, 2 * maze.start[1] + 1.5);
     const violations: string[] = [];
     let frame = 0;
     const onTick = () => {
-      const cell = trail[trail.length - 1];
-      const cx = 2 * cell[0] + 1.5;
-      const cy = 2 * cell[1] + 1.5;
       const b = api!.getBall();
-      if (segDeepWall(maze, cx, cy, b.x, b.y) > 0.05) {
-        violations.push(`f=${frame} cell=[${cell}] ball=(${b.x.toFixed(2)},${b.y.toFixed(2)})`);
+      if (pushPoint(state, b.x, b.y)) {
+        frame++;
       }
-      frame++;
+      // 末段（最后采样点→球当前位置）每帧检查：端点恒贴球的实时延长线
+      const n = state.xs.length - 1;
+      if (n >= 1) {
+        const depth = segDeepWall(maze, state.xs[n], state.ys[n], b.x, b.y);
+        if (depth > 0.05) {
+          violations.push(`f=${frame} 末段 depth=${depth.toFixed(2)}`);
+        }
+      }
     };
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
-      tree = ReactTestRenderer.create(
-        React.createElement(Harness, {
-          maze,
-          onEnterCell: (c: CellPoint) => {
-            trail.push(c);
-          },
-          onTick,
-        }),
-      );
+      tree = ReactTestRenderer.create(React.createElement(Harness, { maze, onTick }));
     });
     const rng = mulberry32(20261013);
     let dx = 0;
@@ -146,6 +144,15 @@ describe('轨迹尾巴线几何', () => {
       env.joyRef.current = { x: dx, y: dy };
       await stepFrames(1);
     }
+    // 全量折线检查（相邻采样点段）
+    for (let k = 0; k + 1 < state.xs.length; k++) {
+      const depth = segDeepWall(maze, state.xs[k], state.ys[k], state.xs[k + 1], state.ys[k + 1]);
+      if (depth > 0.05) {
+        violations.push(`seg ${k} depth=${depth.toFixed(2)}`);
+      }
+    }
+    // 确认确实产生了足量采样（防 rAF/判据回归导致空走）
+    expect(state.xs.length).toBeGreaterThan(100);
     expect(violations).toEqual([]);
     await ReactTestRenderer.act(() => {
       tree.unmount();

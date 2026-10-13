@@ -10,12 +10,13 @@ import {
   joystickZoneHeight,
   paletteForSeed,
   TRAIL_STYLE_LABEL,
-  TRAIL_WIDTH,
 } from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import Minimap from '../components/Minimap';
 import TrailLayer from '../components/TrailLayer';
+import LiveTrailLayer from '../components/LiveTrailLayer';
+import type { LiveTrailHandle } from '../components/LiveTrailLayer';
 import HudBar from '../components/HudBar';
 import JoystickView from '../components/JoystickView';
 import type { JoystickViewHandle } from '../components/JoystickView';
@@ -142,55 +143,9 @@ export default function MazeGameScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const trailSnapshot = useMemo(() => trailRef.current.slice(), [trailVersion]);
 
-  // 轨迹实时尾巴线：viewport 层一条线 View，从倒数第二个格中心（无则起点格）直连球当前位置，
-  // 由引擎 onTick 每帧直写（静态折线只画到倒数第二个格）——端点恒贴球、无分段跳变；
-  // 颜色随风格/步数低频变化，经 ref 供直写读取（避免 outdated 闭包）
-  const tailColor = useMemo(() => {
-    if (trailStyle === 'rainbow') {
-      return `hsl(${(steps * 15) % 360}, 85%, 52%)`;
-    }
-    return palette.wallDark;
-  }, [trailStyle, steps, palette.wallDark]);
-  const tailColorRef = useRef(tailColor);
-  tailColorRef.current = tailColor;
-  const tailRef = useRef<View>(null);
-  const updateTail = () => {
-    const v = tailRef.current;
-    if (!v) return;
-    const b = engineRef.current.getBall();
-    const c = engineRef.current.getCam();
-    const k = cellPxRef.current * engineRef.current.getCamScale();
-    const trail = trailRef.current;
-    // 锚点为"球当前格中心"：格中心→球恒在"格 + 其归属通道"的正交通路内，直线永不穿墙角
-    const anchor = trail[trail.length - 1];
-    if (!anchor) return;
-    const p1x = (2 * anchor[0] + 1.5 - c.x) * k + viewport.width / 2;
-    const p1y = (2 * anchor[1] + 1.5 - c.y) * k + viewport.height / 2;
-    const p2x = (b.x - c.x) * k + viewport.width / 2;
-    const p2y = (b.y - c.y) * k + viewport.height / 2;
-    const len = Math.hypot(p2x - p1x, p2y - p1y);
-    const w = TRAIL_WIDTH * k;
-    if (len < 0.5) {
-      v.setNativeProps({ style: { opacity: 0 } });
-      return;
-    }
-    const angle = (Math.atan2(p2y - p1y, p2x - p1x) * 180) / Math.PI;
-    v.setNativeProps({
-      style: {
-        opacity: 1,
-        left: (p1x + p2x) / 2 - len / 2,
-        top: (p1y + p2y) / 2 - w / 2,
-        width: len,
-        height: w,
-        borderRadius: w / 2,
-        backgroundColor: tailColorRef.current,
-        transform: [{ rotate: `${angle}deg` }],
-      },
-    });
-  };
-  // 供低频 effect（换局即时收起）调用最新闭包，避免 exhaustive-deps 抖动
-  const updateTailRef = useRef(updateTail);
-  updateTailRef.current = updateTail;
+  // 轨迹实时层：球真实路径逐帧采样（端点恒为球），由引擎 onTick 每帧直写；
+  // 换局 reset、样式切换 restyle 经 imperative handle 驱动
+  const liveTrailRef = useRef<LiveTrailHandle>(null);
 
   const engine = useGameEngine({
     maze,
@@ -201,7 +156,10 @@ export default function MazeGameScreen() {
     resetToken,
     camScaleRef,
     cellPxRef,
-    onTick: updateTail,
+    onTick: () => {
+      const b = engineRef.current.getBall();
+      liveTrailRef.current?.tick(b.x, b.y);
+    },
     onStart: () => useMazeStore.getState().startGame(Date.now()),
     onEnterCell: (cell) => {
       trailRef.current.push(cell);
@@ -287,9 +245,8 @@ export default function MazeGameScreen() {
   useEffect(() => {
     trailRef.current = [[maze.start[0], maze.start[1]]];
     setTrailVersion((v) => v + 1);
-    // 尾巴线即时复位：此时引擎已 reset 回起点（本 effect 晚于引擎 reset effect 执行），
-    // 轨迹仅剩起点 → 与球重合（长度 ≈ 0）→ 直写收起
-    updateTailRef.current();
+    // 轨迹采样即时复位：重置为单起点（本 effect 晚于引擎 reset effect 执行，球已回起点）
+    liveTrailRef.current?.reset(2 * maze.start[0] + 1.5, 2 * maze.start[1] + 1.5);
     if (settleTimerRef.current) {
       clearTimeout(settleTimerRef.current);
       settleTimerRef.current = null;
@@ -300,6 +257,11 @@ export default function MazeGameScreen() {
     }
     setHint('');
   }, [maze, resetToken]);
+
+  // 轨迹样式/配色切换（抽屉按钮/换配色）：静态块与段槽即时重建
+  useEffect(() => {
+    liveTrailRef.current?.restyle();
+  }, [trailStyle, palette.wallDark]);
 
   // 卸载清理：清掉可能挂起的防抖/提示定时器
   useEffect(
@@ -415,16 +377,19 @@ export default function MazeGameScreen() {
               <TrailLayer
                 maze={maze}
                 cellPx={cellPxState}
-                palette={palette}
-                trailStyle={trailStyle}
-                trail={trailSnapshot}
                 ghost={ghost}
                 shortestPath={shortestPath}
               />
+              {/* 实时轨迹层：球真实路径采样（容器内世界坐标定位，随镜头变换自动跟随） */}
+              <LiveTrailLayer
+                ref={liveTrailRef}
+                maze={maze}
+                cellPx={cellPxState}
+                trailStyle={trailStyle}
+                palette={palette}
+              />
             </View>
           )}
-          {/* 实时尾巴线：viewport 层（不经容器变换），由引擎 onTick 每帧直写；置于球下层 */}
-          <View ref={tailRef} testID="trail-tail" pointerEvents="none" style={styles.trailTail} />
           <BallView ref={ballRef} />
           <Minimap
             maze={maze}
@@ -492,15 +457,6 @@ const styles = StyleSheet.create({
   region: { flex: 1 },
   viewport: { flex: 1, overflow: 'hidden' },
   world: { position: 'absolute', left: 0, top: 0 },
-  trailTail: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 0,
-    height: 0,
-    borderRadius: 0,
-    opacity: 0,
-  },
   hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 50 },
   hintText: {
     backgroundColor: 'rgba(50,40,90,0.92)',

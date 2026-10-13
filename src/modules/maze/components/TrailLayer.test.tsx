@@ -3,80 +3,39 @@ import ReactTestRenderer from 'react-test-renderer';
 import { Path } from 'react-native-svg';
 import TrailLayer from './TrailLayer';
 import { generateMaze } from '../services/generator';
-import { PALETTES } from '../constants';
 
-describe('TrailLayer', () => {
+describe('TrailLayer（回顾层：幽灵轨迹 + 最短路径）', () => {
   const maze = generateMaze(1234567, 'easy');
+  const trail = [
+    [3, 3],
+    [4, 3],
+    [5, 3],
+    [5, 4],
+  ] as [number, number][];
 
-  it('空轨迹渲染为空', async () => {
+  it('无幽灵且无最短路径：渲染为空', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
-        <TrailLayer
-          maze={maze}
-          cellPx={12}
-          palette={PALETTES[0]}
-          trailStyle="rainbow"
-          trail={[]}
-          ghost={null}
-          shortestPath={null}
-        />,
+        <TrailLayer maze={maze} cellPx={12} ghost={null} shortestPath={null} />,
       );
     });
     expect(tree.root.findAllByType(Path).length).toBe(0);
   });
 
-  it('彩虹模式按桶生成 Path，幽灵与最短路径各一条', async () => {
-    const trail = [
-      [3, 3],
-      [4, 3],
-      [5, 3],
-      [5, 4],
-    ] as [number, number][];
+  it('幽灵与最短路径各一条 Path（含正确线段数）', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
-        <TrailLayer
-          maze={maze}
-          cellPx={12}
-          palette={PALETTES[0]}
-          trailStyle="rainbow"
-          trail={trail}
-          ghost={trail}
-          shortestPath={trail}
-        />,
+        <TrailLayer maze={maze} cellPx={12} ghost={trail} shortestPath={trail} />,
       );
     });
-    // 轨迹桶 + 幽灵 1 + 最短路径 1
-    expect(tree.root.findAllByType(Path).length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('静态折线画满全程（到当前格中心；格中心→球的末段由实时尾巴线负责）', async () => {
-    const trail = [
-      [3, 3],
-      [4, 3],
-      [5, 3],
-      [5, 4],
-    ] as [number, number][];
-    let tree!: ReactTestRenderer.ReactTestRenderer;
-    await ReactTestRenderer.act(() => {
-      tree = ReactTestRenderer.create(
-        <TrailLayer
-          maze={maze}
-          cellPx={12}
-          palette={PALETTES[0]}
-          trailStyle="rainbow"
-          trail={trail}
-          ghost={null}
-          shortestPath={null}
-        />,
-      );
-    });
-    // 4 点轨迹完整应为 3 段（静态层画满；尾巴线只负责"格中心→球"的实时延长段）
-    const mCount = tree.root
-      .findAllByType(Path)
+    const paths = tree.root.findAllByType(Path);
+    expect(paths.length).toBe(2);
+    // 4 点格折线 → 3 段（M + 3L 合并于一条 d）
+    const mCount = paths
       .map((n) => ((n.props.d as string).match(/M /g) ?? []).length)
       .reduce((a, b) => a + b, 0);
-    expect(mCount).toBe(3);
+    expect(mCount).toBe(6); // 2 条 Path × 3 段
   });
 });

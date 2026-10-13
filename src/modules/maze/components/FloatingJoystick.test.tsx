@@ -76,33 +76,55 @@ function findZone(tree: ReactTestRenderer.ReactTestRenderer) {
   return tree.root.find((n) => typeof n.type === 'string' && n.props.testID === 'joy-zone');
 }
 
-/** 松手淡出由 mock 原生动画（16ms 回调）完成，推进真实计时器让视觉收起 */
-async function flushFade() {
+/** 松手回位/透明度恢复由 mock 原生动画（16ms 回调）完成，推进真实计时器让动画收尾 */
+async function flushAnim() {
   await ReactTestRenderer.act(async () => {
-    await new Promise<void>((r) => setTimeout(r, 30));
+    await new Promise<void>((r) => setTimeout(r, 260));
   });
 }
 
 describe('FloatingJoystick', () => {
-  it('渲染热区；初始无浮动底座，按下出现、松手淡出收起', async () => {
+  it('常驻模型：初始即渲染底座/旋钮；grant 后不消失；release 后仍存在（回位）', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<FloatingJoystick onMove={() => {}} />);
     });
     expect(hostNodes(tree, 'joy-zone').length).toBe(1);
-    expect(hostNodes(tree, 'joy-base-float').length).toBe(0);
+    // 待机也常驻渲染（半透明由动画值控制，不挂载/卸载）
+    expect(hostNodes(tree, 'joy-base-float').length).toBe(1);
+    expect(hostNodes(tree, 'joy-knob-float').length).toBe(1);
 
     await ReactTestRenderer.act(() => {
       findZone(tree).props.onResponderGrant(makeResponderEvent(30, 20, 1));
     });
+    // 按下后保持常驻
     expect(hostNodes(tree, 'joy-base-float').length).toBe(1);
     expect(hostNodes(tree, 'joy-knob-float').length).toBe(1);
 
     await ReactTestRenderer.act(() => {
       findZone(tree).props.onResponderRelease(makeResponderEvent(30, 20, 2));
     });
-    await flushFade();
-    expect(hostNodes(tree, 'joy-base-float').length).toBe(0);
+    await flushAnim();
+    // 松手回位：视觉不卸载
+    expect(hostNodes(tree, 'joy-base-float').length).toBe(1);
+    expect(hostNodes(tree, 'joy-knob-float').length).toBe(1);
+  });
+
+  it('手势进行中拒绝父级接管（onResponderTerminationRequest 返回 false）', async () => {
+    let tree!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(() => {
+      tree = ReactTestRenderer.create(<FloatingJoystick onMove={() => {}} />);
+    });
+    const zone = findZone(tree);
+    await ReactTestRenderer.act(() => {
+      zone.props.onResponderGrant(makeResponderEvent(30, 20, 1));
+    });
+    // PanResponder 包装层将 config.onPanResponderTerminationRequest 映射为宿主 props
+    expect(zone.props.onResponderTerminationRequest(makeResponderEvent(30, 20, 2))).toBe(false);
+    await ReactTestRenderer.act(() => {
+      zone.props.onResponderRelease(makeResponderEvent(30, 20, 3));
+    });
+    await flushAnim();
   });
 
   it('grant 不输出非零向量；拖动输出钳制后归一化向量，松手归零', async () => {
@@ -132,7 +154,7 @@ describe('FloatingJoystick', () => {
     expect(moves[0]).toEqual({ x: 1, y: 0 });
     expect(moves[1]).toEqual({ x: 1, y: 0 });
     expect(moves[2]).toEqual({ x: 0, y: 0 });
-    await flushFade();
+    await flushAnim();
   });
 
   it('热区内快速两次轻触触发 onDoubleTap', async () => {
@@ -155,6 +177,6 @@ describe('FloatingJoystick', () => {
     });
 
     expect(onDoubleTap).toHaveBeenCalledTimes(1);
-    await flushFade();
+    await flushAnim();
   });
 });

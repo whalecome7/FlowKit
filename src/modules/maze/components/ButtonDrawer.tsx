@@ -11,8 +11,8 @@ import {
 import { useTheme } from '../../../theme';
 import type { Palette } from '../constants';
 
-/** 面板估算高度（dp）：关闭时 translateY 到该值滑出屏幕 */
-const PANEL_H = 148;
+/** 面板估算高度（dp）：关闭时 translateY 到该值滑出屏幕（含底部安全留白） */
+const PANEL_H = 200;
 
 interface DrawerAction {
   key: string;
@@ -29,7 +29,8 @@ interface Props {
 
 /**
  * 按钮抽屉：底部中央把手点击/上滑打开；点遮罩或面板下拉关闭。
- * 把手（zIndex 40）高于浮动摇杆热区（5），遮罩/面板（45）高于把手，打开时盖住热区。
+ * 渲染在屏幕根层：容器 absoluteFill 覆盖全屏且 pointerEvents="box-none"（透传底层触摸），
+ * 把手浮于底部（zIndex 40），遮罩/面板（45）打开时覆盖全屏（HUD 与迷宫均不可操作）。
  */
 export default function ButtonDrawer({ actions, palette }: Props) {
   const { colors } = useTheme();
@@ -118,7 +119,7 @@ export default function ButtonDrawer({ actions, palette }: Props) {
   );
 
   return (
-    <>
+    <View testID="drawer-root" pointerEvents="box-none" style={styles.container}>
       <View testID="drawer-handle" style={styles.handle} {...handleResponder.panHandlers}>
         <Text style={styles.handleText}>≡</Text>
       </View>
@@ -156,14 +157,22 @@ export default function ButtonDrawer({ actions, palette }: Props) {
           </Animated.View>
         </>
       )}
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // 全屏容器（absoluteFillObject 等价写法）：box-none 只让把手/遮罩/面板吃触摸
+  container: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
   handle: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 34, // 更高，避开系统手势条
     alignSelf: 'center',
     width: 96,
     height: 24,
@@ -191,6 +200,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 12,
+    paddingBottom: 40, // 系统手势条安全留白：按钮行与系统条分离
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     zIndex: 45,

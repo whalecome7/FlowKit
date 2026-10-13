@@ -121,6 +121,19 @@ describe('ButtonDrawer', () => {
     });
   });
 
+  it('容器覆盖全屏且 pointerEvents=box-none（不挡底层，仅把手/遮罩/面板吃触摸）', async () => {
+    const tree = await renderDrawer(makeActions());
+    const root = hostNodes(tree, 'drawer-root')[0];
+    expect(root).toBeTruthy();
+    expect(root.props.pointerEvents).toBe('box-none');
+    expect(root.props.style).toEqual(
+      expect.objectContaining({ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }),
+    );
+    await ReactTestRenderer.act(() => {
+      tree.unmount();
+    });
+  });
+
   it('把手点击打开抽屉，六个按钮文案齐全', async () => {
     const tree = await renderDrawer(makeActions());
     await tapHandle(tree);

@@ -150,13 +150,22 @@ export function useGameEngine(opts: EngineOptions) {
     cam.current.y = maze.G <= wH ? maze.G / 2 : Math.max(wH / 2, Math.min(maze.G - wH / 2, cam.current.y));
   }
 
-  /** 缩放澄清：把手势缩放固化进绘制尺寸（避免位图放大模糊）。返回值即新的 cellPx（无变化返回 null） */
+  /**
+   * 缩放澄清：计算固化进绘制尺寸的目标 cellPx（1/4 粒度取整，避免位图放大模糊）。
+   * 只计算不改 camScale——须由屏幕在更新 cellPx 后调用 applySettle 成对落地，
+   * 否则 cellPx 与 camScale 分两拍更新会产生 1-2 帧断拍抖动。无变化返回 null。
+   */
   function settleZoom(): number | null {
     const s = camScale();
     if (Math.abs(s - 1) < 0.12) return null;
-    const targetPx = Math.round(cellPxRef.current * s * 4) / 4;
+    return Math.round(cellPxRef.current * s * 4) / 4;
+  }
+
+  /** 澄清落地：cellPx 已由屏幕更新后调用，将缩放倍数归 1 并重写视图（与 cellPx 更新成对） */
+  function applySettle(): void {
     camScaleRef.current = 1;
-    return targetPx;
+    writeBall();
+    writeContainer();
   }
 
   /** 镜头跳转到世界坐标（缩略图点击） */
@@ -313,6 +322,7 @@ export function useGameEngine(opts: EngineOptions) {
     pan,
     zoomAt,
     settleZoom,
+    applySettle,
     jumpTo,
     getCamScale: camScale,
   };

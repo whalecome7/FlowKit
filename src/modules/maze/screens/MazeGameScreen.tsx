@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, PanResponder, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -39,7 +39,6 @@ export default function MazeGameScreen() {
   const phase = useMazeStore((s) => s.phase);
   const elapsedMs = useMazeStore((s) => s.elapsedMs);
   const best = useMazeStore((s) => s.best);
-  const startedAt = useMazeStore((s) => s.startedAt);
   const setDifficulty = useMazeStore((s) => s.setDifficulty);
   const setSeed = useMazeStore((s) => s.setSeed);
   const resetGame = useMazeStore((s) => s.resetGame);
@@ -50,7 +49,7 @@ export default function MazeGameScreen() {
   const joyRef = useRef<JoyVector>({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [resetToken, setResetToken] = useState(0);
-  const [nowTick, setNowTick] = useState(0);
+  const [timeText, setTimeText] = useState('00:00.0');
   const [seedModal, setSeedModal] = useState(false);
 
   const maze = useMemo(() => generateMaze(seed, difficulty), [seed, difficulty]);
@@ -94,18 +93,22 @@ export default function MazeGameScreen() {
     navigation.setParams({ viewRecord: undefined });
   }, [viewRecord, navigation]);
 
+  // 计时文本：仅在显示值变化时 setText（跳秒才重渲染，避免 10fps 空渲染干扰缩放）
   useEffect(() => {
     if (phase !== 'playing') return;
-    const timer = setInterval(() => setNowTick((v) => v + 1), 100);
+    const timer = setInterval(() => {
+      const next = fmtTime(Date.now() - useMazeStore.getState().startedAt);
+      setTimeText((prev) => (prev === next ? prev : next));
+    }, 100);
     return () => clearInterval(timer);
   }, [phase]);
 
-  const timeText =
-    phase === 'won'
-      ? fmtTime(elapsedMs)
-      : startedAt > 0
-        ? fmtTime(Date.now() - startedAt)
-        : '00:00.0';
+  // won/ready 的计时文本直接同步（playing 由上面的 interval 驱动）
+  useEffect(() => {
+    if (phase === 'won') setTimeText(fmtTime(elapsedMs));
+    if (phase === 'ready') setTimeText('00:00.0');
+  }, [phase, elapsedMs]);
+
   const bestText = best[difficulty] ? fmtTime(best[difficulty]!.timeMs) : '--';
 
   const viewportRef = useRef<View>(null);
@@ -132,15 +135,13 @@ export default function MazeGameScreen() {
   const lastTapRef = useRef(0);
   const movedSinceGrantRef = useRef(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 澄清待落地标记：cellPxState 更新后在同一 effect 中调用 applySettle（与 camScale 成对生效） */
+  const settlePendingRef = useRef(false);
   const [trailVersion, setTrailVersion] = useState(0);
   const trailRef = useRef<CellPoint[]>([[maze.start[0], maze.start[1]]]);
   // trailVersion 作为唯一依赖：ref 写入不触发渲染，需版本号驱动快照重建
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const trailSnapshot = useMemo(() => trailRef.current.slice(), [trailVersion]);
-
-  useEffect(() => {
-    cellPxRef.current = cellPxState;
-  }, [cellPxState]);
 
   const engine = useGameEngine({
     maze,
@@ -184,6 +185,16 @@ export default function MazeGameScreen() {
   });
   const engineRef = useRef(engine);
   engineRef.current = engine;
+
+  // cellPx 同步：澄清待落地时在同一 effect 中调用 applySettle（camScale 归 1 + 重写视图），
+  // 使 cellPx 与 camScale 成对生效，消除 1-2 帧断拍抖动
+  useEffect(() => {
+    cellPxRef.current = cellPxState;
+    if (settlePendingRef.current) {
+      settlePendingRef.current = false;
+      engineRef.current.applySettle();
+    }
+  }, [cellPxState]);
 
   useEffect(() => {
     trailRef.current = [[maze.start[0], maze.start[1]]];
@@ -372,12 +383,12 @@ export default function MazeGameScreen() {
     settleTimerRef.current = setTimeout(() => {
       settleTimerRef.current = null;
       const px = engineRef.current.settleZoom();
-      if (px) setCellPxState(px);
+      if (px) {
+        settlePendingRef.current = true;
+        setCellPxState(px);
+      }
     }, 250);
   }
-
-  // nowTick：计时显示的渲染驱动（每 100ms 触发 timeText 重新求值）
-  void nowTick;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -435,14 +446,18 @@ export default function MazeGameScreen() {
             <Text style={styles.hintText}>{hint}</Text>
           </View>
         )}
+      </View>
+      {/* 摇杆带：迷宫视口之下的固定留白区（常驻摇杆居中），迷宫不占满全屏 */}
+      <View style={styles.joyZoneWrap}>
         <FloatingJoystick
           onMove={(v) => {
             joyRef.current = v;
           }}
           onDoubleTap={() => engineRef.current.followBall()}
         />
-        <ButtonDrawer actions={drawerActions} palette={palette} />
       </View>
+      {/* 抽屉置于根层：容器覆盖全屏（遮罩可盖住 HUD 与迷宫），box-none 透传底层触摸 */}
+      <ButtonDrawer actions={drawerActions} palette={palette} />
       <WinModal
         visible={phase === 'won'}
         timeText={fmtTime(elapsedMs)}
@@ -470,6 +485,10 @@ export default function MazeGameScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   viewport: { flex: 1, overflow: 'hidden' },
+  // 摇杆带高度：26% 屏高，clamp [200, 260]（含常驻摇杆与底部留白）
+  joyZoneWrap: {
+    height: Math.min(260, Math.max(200, 0.26 * Dimensions.get('window').height)),
+  },
   world: { position: 'absolute', left: 0, top: 0 },
   hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 50 },
   hintText: {

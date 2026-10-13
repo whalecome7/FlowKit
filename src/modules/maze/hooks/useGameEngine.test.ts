@@ -197,11 +197,11 @@ describe('useGameEngine 镜头', () => {
     expect(env.camScaleRef.current).toBeCloseTo(MIN_SCALE_DP / env.cellPxRef.current, 9);
   });
 
-  it('settleZoom：|s-1|<0.12 返回 null；否则固化 cellPx 并保持 cellPx*s 乘积', async () => {
+  it('settleZoom：|s-1|<0.12 返回 null；否则只计算目标 cellPx（不改 camScale），applySettle 成对落地', async () => {
     const maze = generateMaze(1234567, 'easy');
     const { env, getApi } = await mountHarness(maze, VIEWPORT);
 
-    // 微小差额：不清零，返回 null
+    // 微小差额：不清零，返回 null，camScale 不动
     env.camScaleRef.current = 1.05;
     expect(getApi().settleZoom()).toBeNull();
     expect(env.camScaleRef.current).toBe(1.05);
@@ -209,16 +209,22 @@ describe('useGameEngine 镜头', () => {
     expect(getApi().settleZoom()).toBeNull();
     expect(env.camScaleRef.current).toBe(0.9);
 
-    // 显著差额：固化进 cellPx（1/4 粒度 → 乘积误差 ≤ 1/8）
+    // 显著差额：只返回目标绘制尺寸（1/4 粒度 → 乘积误差 ≤ 1/8），camScale 保持原值不落拍
     env.cellPxRef.current = BASE_CELL_DP;
     env.camScaleRef.current = 2.7;
     const px = getApi().settleZoom();
     expect(px).not.toBeNull();
-    expect(env.camScaleRef.current).toBe(1);
+    expect(env.camScaleRef.current).toBe(2.7);
     expect(Math.abs(px! - BASE_CELL_DP * 2.7)).toBeLessThanOrEqual(1 / 8 + 1e-9);
-    // 屏幕固化路径：cellPxRef 更新为新值（乘积保持）
+
+    // 屏幕更新 cellPx 后 applySettle 落地：camScale 归 1（乘积保持）并重写球/容器视图
+    const view = env.ballViewRef.current as unknown as { setNativeProps: jest.Mock };
+    const before = view.setNativeProps.mock.calls.length;
     env.cellPxRef.current = px!;
+    getApi().applySettle();
+    expect(env.camScaleRef.current).toBe(1);
     expect(env.cellPxRef.current * env.camScaleRef.current).toBe(px);
+    expect(view.setNativeProps.mock.calls.length).toBe(before + 2); // writeBall + writeContainer
   });
 
   it('clampCam：视图小于迷宫时中心钳制在 [wW/2, G-wW/2]；全览时锁 G/2', async () => {
@@ -266,19 +272,21 @@ describe('useGameEngine 镜头', () => {
     expect(Math.abs(c2.x - c1.x) + Math.abs(c2.y - c1.y)).toBeGreaterThan(0.5);
   });
 
-  it('【防 C1 回归】settleZoom 固化后 camScale 保持 1 不被 fit 重算覆盖；仅视口变化才重算', async () => {
+  it('【防 C1 回归】澄清落地后 camScale 保持 1 不被 fit 重算覆盖；仅视口变化才重算', async () => {
     const maze = generateMaze(1234567, 'easy');
     const { env, getApi, rerender } = await mountHarness(maze, VIEWPORT);
 
-    // 捏合放大后澄清固化
+    // 捏合放大后澄清：settleZoom 只计算，camScale 尚未落地
     getApi().zoomAt(150, 150, 1.5);
     expect(env.camScaleRef.current).toBeGreaterThan(1);
     const px = getApi().settleZoom();
     expect(px).not.toBeNull();
-    expect(env.camScaleRef.current).toBe(1);
+    expect(env.camScaleRef.current).toBeGreaterThan(1);
 
-    // 屏幕 setCellPxState(px) 的效果：cellPxRef 更新 + 组件重渲染（旧实现的初始镜头 effect 在此复燃）
+    // 屏幕 setCellPxState(px) 的效果：cellPx 更新 + 同一 effect 中 applySettle 归 1
     env.cellPxRef.current = px!;
+    getApi().applySettle();
+    expect(env.camScaleRef.current).toBe(1);
     await rerender();
     await stepFrames(5);
     expect(env.camScaleRef.current).toBe(1);

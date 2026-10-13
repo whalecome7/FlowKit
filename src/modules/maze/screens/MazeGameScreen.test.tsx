@@ -3,7 +3,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import { Text } from 'react-native';
 import { ThemeProvider } from '../../../theme';
 import MazeGameScreen from './MazeGameScreen';
-import Joystick from '../components/Joystick';
+import FloatingJoystick from '../components/FloatingJoystick';
 import { generateMaze } from '../services/generator';
 import { useMazeStore } from '../store';
 import type { CellPoint, HistoryRecord } from '../types';
@@ -131,9 +131,9 @@ describe('MazeGameScreen', () => {
         viewportNode.props.onLayout({ nativeEvent: { layout: { width: 300, height: 500 } } });
       });
 
-      // 通过屏幕渲染的 Joystick 实例写摇杆（其 onMove 即屏幕写 joyRef 的回调）。
+      // 通过屏幕渲染的 FloatingJoystick 实例写摇杆（其 onMove 即屏幕写 joyRef 的回调）。
       // 默认 store（seed 1000000 / easy，起点 [2,10]）向右是通道：推 {x:1,y:0}
-      const joystick = tree.root.findByType(Joystick);
+      const joystick = tree.root.findByType(FloatingJoystick);
       joystick.props.onMove({ x: 1, y: 0 });
       // 推进 30 帧让引擎真实跑 moveBall/onEnterCell，球移动出起步格产生轨迹
       await stepFrames(30);

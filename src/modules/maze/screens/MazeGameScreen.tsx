@@ -1,17 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTheme } from '../../../theme';
 import { BASE_CELL_DP, DIFFS, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import Minimap from '../components/Minimap';
 import TrailLayer from '../components/TrailLayer';
 import HudBar from '../components/HudBar';
-import Joystick from '../components/Joystick';
+import FloatingJoystick from '../components/FloatingJoystick';
+import ButtonDrawer from '../components/ButtonDrawer';
 import { SeedModal, ViewBanner, WinModal } from '../components/GameModals';
 import { useGameEngine } from '../hooks/useGameEngine';
 import { findShortestPath, generateMaze } from '../services/generator';
@@ -47,7 +47,6 @@ export default function MazeGameScreen() {
   const trailStyle = useMazeStore((s) => s.trailStyle);
   const cycleTrailStyle = useMazeStore((s) => s.cycleTrailStyle);
 
-  const { colors } = useTheme();
   const joyRef = useRef<JoyVector>({ x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [resetToken, setResetToken] = useState(0);
@@ -239,12 +238,13 @@ export default function MazeGameScreen() {
   }, [viewport.width, viewport.height]);
 
   // 重开一局的统一入口：先归零 store 并清查看态，再 bump 引擎 resetToken
-  const resetAndBump = () => {
+  // （useCallback：drawerActions 依赖其引用稳定，避免 lint 报不稳定依赖）
+  const resetAndBump = useCallback(() => {
     resetGame();
     setViewingRecord(null);
     setShowShortest(false);
     setResetToken((v) => v + 1);
-  };
+  }, [resetGame]);
 
   const pickDifficulty = (d: MazeDifficulty) => {
     if (d === difficulty) return;
@@ -253,14 +253,14 @@ export default function MazeGameScreen() {
     resetAndBump();
   };
 
-  const newMaze = () => {
+  const newMaze = useCallback(() => {
     setSeed(randSeed());
     resetAndBump();
-  };
+  }, [setSeed, resetAndBump]);
 
   const restart = resetAndBump;
 
-  const showHint = () => {
+  const showHint = useCallback(() => {
     const b = engineRef.current.getBall();
     const from: CellPoint = [Math.floor((b.x - 1) / 2), Math.floor((b.y - 1) / 2)];
     const path = findShortestPath(maze, from, maze.end);
@@ -270,7 +270,19 @@ export default function MazeGameScreen() {
       hintTimerRef.current = null;
       setHint('');
     }, 1800);
-  };
+  }, [maze]);
+
+  const drawerActions = useMemo(
+    () => [
+      { key: 'new', label: '🎲 新迷宫', highlight: true, onPress: newMaze },
+      { key: 'restart', label: '↻ 重开', onPress: restart },
+      { key: 'trail', label: TRAIL_STYLE_LABEL[trailStyle], onPress: cycleTrailStyle },
+      { key: 'history', label: '📜 历史', onPress: () => navigation.navigate('MazeHistory') },
+      { key: 'follow', label: '🎯 跟球', onPress: () => engineRef.current.followBall() },
+      { key: 'hint', label: '💡 提示', onPress: showHint },
+    ],
+    [trailStyle, newMaze, restart, cycleTrailStyle, navigation, showHint],
+  );
 
   // 手势：单指平移 / 双指缩放 / 双击回跟随；手势结束后 250ms 澄清缩放
   const gesture = useMemo(
@@ -423,47 +435,13 @@ export default function MazeGameScreen() {
             <Text style={styles.hintText}>{hint}</Text>
           </View>
         )}
-      </View>
-      <View style={[styles.bottom, { backgroundColor: palette.bg }]}>
-        <Joystick
+        <FloatingJoystick
           onMove={(v) => {
             joyRef.current = v;
           }}
+          onDoubleTap={() => engineRef.current.followBall()}
         />
-        <View style={styles.btnGrid}>
-          <TouchableOpacity
-            style={[styles.gbtn, { backgroundColor: palette.wall }]}
-            onPress={newMaze}>
-            <Text style={styles.gbtnTextLight}>🎲 新迷宫</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
-            onPress={restart}>
-            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>↻ 重开</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
-            onPress={cycleTrailStyle}>
-            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>
-              {TRAIL_STYLE_LABEL[trailStyle]}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
-            onPress={() => navigation.navigate('MazeHistory')}>
-            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>📜 历史</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
-            onPress={() => engineRef.current.followBall()}>
-            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>🎯 跟球</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.gbtn, { backgroundColor: colors.surfaceAlt }]}
-            onPress={showHint}>
-            <Text style={[styles.gbtnText, { color: colors.textSecondary }]}>💡 提示</Text>
-          </TouchableOpacity>
-        </View>
+        <ButtonDrawer actions={drawerActions} palette={palette} />
       </View>
       <WinModal
         visible={phase === 'won'}
@@ -493,17 +471,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   viewport: { flex: 1, overflow: 'hidden' },
   world: { position: 'absolute', left: 0, top: 0 },
-  bottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  btnGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gbtn: { flexGrow: 1, flexBasis: '45%', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  gbtnTextLight: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  gbtnText: { fontSize: 14, fontWeight: '600' },
   hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 30 },
   hintText: {
     backgroundColor: 'rgba(50,40,90,0.92)',

@@ -213,6 +213,13 @@ export default function MazeGameScreen() {
       followBall: () => engineRef.current.followBall(),
     },
     onCameraIdle: scheduleSettle,
+    // 任一触摸按下 → 取消排队中的缩放澄清（防"抬起后 250ms 内重新按下 → 澄清在拖动中落地"）
+    onGestureStart: () => {
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+    },
   });
 
   // cellPx 同步：澄清待落地时在同一 effect 中调用 applySettle（camScale 归 1 + 重写视图），

@@ -101,13 +101,15 @@ function makeApi() {
   const manual = jest.fn();
   const followBall = jest.fn();
   const idle = jest.fn();
+  const gestureStart = jest.fn();
   const api: RegionApi = {
     onJoystickVector: vector,
     joystickRef: { current: joystick },
     cam: { manual, pan, zoomAt, followBall },
     onCameraIdle: idle,
+    onGestureStart: gestureStart,
   };
-  return { api, joystick, vector, pan, zoomAt, manual, followBall, idle };
+  return { api, joystick, vector, pan, zoomAt, manual, followBall, idle, gestureStart };
 }
 
 type Mounted = ReturnType<typeof makeApi> & {
@@ -243,8 +245,8 @@ describe('useGameGestures 统一手势', () => {
     const extraMoved = { ...extra, pageX: 200, pageY: 300, prevPageX: 250, prevPageY: 380 };
     move(h, [joy, camMoved, extraMoved], extraMoved);
     expect(h.zoomAt).not.toHaveBeenCalled();
-    // 摇杆与镜头均不受其影响（镜头指未动 → 平移差为零）
-    expect(h.pan).toHaveBeenLastCalledWith(0, 0);
+    // 摇杆与镜头均不受其影响（镜头指未动 → 不再下发零平移，pan 次数不变）
+    expect(h.pan).toHaveBeenCalledTimes(1);
   });
 
   it('d) 迷宫区两指捏合：zoomAt 增量 = 指距比（中点锚），单指抬起后重置基线回到平移', async () => {
@@ -385,5 +387,46 @@ describe('useGameGestures 统一手势', () => {
     const again = { id: 2, pageX: 200, pageY: 420 };
     grant(h, [again], again);
     expect(h.joystick.show).toHaveBeenCalledTimes(2);
+  });
+
+  it('i) 静止的镜头指不重复触发 pan/manual：仅坐标变化时下发，纯摇杆移动事件不干扰镜头', async () => {
+    const h = await mount();
+    const joy = { id: 0, pageX: 100, pageY: 400 };
+    const cam = { id: 1, pageX: 100, pageY: 100 };
+    grant(h, [joy], joy);
+    start(h, [joy, cam], cam);
+    // 镜头指移动两次：每次平移 20dp → pan/manual 各 +1
+    const cam1 = { ...cam, pageX: 120, pageY: 100, prevPageX: 100, prevPageY: 100 };
+    move(h, [joy, cam1], cam1);
+    const cam2 = { ...cam1, pageX: 140, pageY: 100, prevPageX: 120, prevPageY: 100 };
+    move(h, [joy, cam2], cam2);
+    expect(h.pan).toHaveBeenCalledTimes(2);
+    expect(h.pan).toHaveBeenLastCalledWith(20, 0);
+    expect(h.manual).toHaveBeenCalledTimes(2);
+    // 镜头指静止于同一坐标，摇杆指继续移动 3 个事件 → 镜头动作次数与移动次数一致（不含静止指的额外事件）
+    const joy1 = { ...joy, pageX: 120, pageY: 380, prevPageX: 100, prevPageY: 400 };
+    move(h, [joy1, cam2], joy1);
+    const joy2 = { ...joy1, pageX: 140, pageY: 360, prevPageX: 120, prevPageY: 380 };
+    move(h, [joy2, cam2], joy2);
+    const joy3 = { ...joy2, pageX: 160, pageY: 340, prevPageX: 140, prevPageY: 360 };
+    move(h, [joy3, cam2], joy3);
+    expect(h.pan).toHaveBeenCalledTimes(2);
+    expect(h.manual).toHaveBeenCalledTimes(2);
+    // 摇杆向量正常输出（位移超有效半径 → 钳制后为单位向量）
+    const v = lastCallArg(h.vector) as { x: number; y: number };
+    expect(Math.hypot(v.x, v.y)).toBeCloseTo(1, 9);
+    expect(v.x).toBeGreaterThan(0);
+    expect(v.y).toBeLessThan(0);
+    expect(h.joystick.moveKnob).toHaveBeenCalled();
+  });
+
+  it('j) 手势开始触发 onGestureStart：任一触摸按下（首触与后续）各通知一次', async () => {
+    const h = await mount();
+    const joy = { id: 0, pageX: 100, pageY: 400 };
+    const cam = { id: 1, pageX: 100, pageY: 100 };
+    grant(h, [joy], joy);
+    expect(h.gestureStart).toHaveBeenCalledTimes(1);
+    start(h, [joy, cam], cam);
+    expect(h.gestureStart).toHaveBeenCalledTimes(2);
   });
 });

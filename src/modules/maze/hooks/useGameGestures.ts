@@ -31,6 +31,8 @@ export interface RegionApi {
   cam: CamApi;
   /** 镜头触摸清空（镜头空闲）时回调：屏幕层据此调度缩放澄清 */
   onCameraIdle?: () => void;
+  /** 新手势（任一触摸按下）开始时的通知（用于取消已排队的缩放澄清等） */
+  onGestureStart?: () => void;
 }
 
 interface Point {
@@ -86,6 +88,8 @@ export function useGameGestures(api: RegionApi) {
 
   /** 分配触摸归属（grant=首指 / start=后续指）：按下瞬间按区域锁定 */
   function allocate(evt: GestureResponderEvent) {
+    // 任一触摸按下即视为新手势开始：通知屏幕取消排队中的缩放澄清
+    apiRef.current.onGestureStart?.();
     if (regionHRef.current <= 0) return; // 布局未知：忽略（不崩溃）
     const id = evt.nativeEvent.identifier ?? 0;
     const p = toRegion(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
@@ -142,9 +146,11 @@ export function useGameGestures(api: RegionApi) {
       const tap = camTapRef.current;
       if (tap && Math.hypot(p.x - tap.x, p.y - tap.y) > TAP_MAX_DIST) tap.moved = true;
       if (camPointsRef.current.size === 1) {
-        // 单指平移：本次采样差（先算差再更新，Map 已在上方 set）
-        apiRef.current.cam.pan(p.x - prev.x, p.y - prev.y);
-        apiRef.current.cam.manual();
+        // 单指平移：仅当该指坐标实际变化才下发（静止指不重复触发 pan/manual）
+        if (p.x !== prev.x || p.y !== prev.y) {
+          apiRef.current.cam.pan(p.x - prev.x, p.y - prev.y);
+          apiRef.current.cam.manual();
+        }
       }
     }
     if (camPointsRef.current.size >= 2) {
@@ -154,13 +160,14 @@ export function useGameGestures(api: RegionApi) {
       const base = pinchDRef.current;
       if (base === null) {
         pinchDRef.current = d; // 首帧基线（正常在第二指落下时已设，此处兜底）
-      } else {
+      } else if (d !== base) {
+        // 仅当指距（任一指坐标）实际变化才缩放与提示手动（静止指不重复触发）
         if (base > 0 && d > 0) {
           apiRef.current.cam.zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / base);
         }
         pinchDRef.current = d;
+        apiRef.current.cam.manual();
       }
-      apiRef.current.cam.manual();
     }
   }
 

@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   viewport: { flex: 1, overflow: 'hidden' },
   world: { position: 'absolute', left: 0, top: 0 },
-  hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 30 },
+  hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 50 },
   hintText: {
     backgroundColor: 'rgba(50,40,90,0.92)',
     color: '#fff',

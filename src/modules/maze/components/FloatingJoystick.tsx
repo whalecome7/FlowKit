@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import type { JoyVector } from '../types';
 
@@ -73,10 +73,14 @@ export default function FloatingJoystick({ onMove, onDoubleTap, heightRatio = 0.
           if (activeRef.current === null) return;
           const ne = evt.nativeEvent;
           const touch = ne.touches.find((t) => t.identifier === activeRef.current);
-          const lx = touch ? touch.locationX : ne.locationX;
-          const ly = touch ? touch.locationY : ne.locationY;
-          const dx = lx - originRef.current.x;
-          const dy = ly - originRef.current.y;
+          if (!touch) {
+            // 首指已抬起（identifier 不在 touches 中）：直接结束本次杆操作，
+            // 绝不让次指以首指原点续杆
+            end();
+            return;
+          }
+          const dx = touch.locationX - originRef.current.x;
+          const dy = touch.locationY - originRef.current.y;
           const mag = Math.hypot(dx, dy);
           if (mag > MOVE_SLOP) movedRef.current = true;
           // 钳制到有效半径得旋钮位移
@@ -91,26 +95,20 @@ export default function FloatingJoystick({ onMove, onDoubleTap, heightRatio = 0.
           });
           onMoveRef.current({ x: kx / RADIUS, y: ky / RADIUS });
         },
-        onPanResponderRelease: end,
+        onPanResponderRelease: release,
         onPanResponderTerminate: end,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
+  // 卸载：停止可能挂起的淡出动画
+  useEffect(() => () => opacity.stopAnimation(), [opacity]);
+
+  /** 复位并淡出：正常松手与"首指抬起中断"共用（不含双击判定） */
   function end() {
     if (activeRef.current === null) return;
     activeRef.current = null;
-    // 双击判定：轻触（未拖动、按压未超时）且距上次轻触 < DOUBLE_TAP_MS
-    if (!movedRef.current && Date.now() - downAtRef.current < TAP_HOLD_MS) {
-      const now = Date.now();
-      if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-        onDoubleTapRef.current?.();
-        lastTapRef.current = 0;
-      } else {
-        lastTapRef.current = now;
-      }
-    }
     onMoveRef.current({ x: 0, y: 0 });
     // 松手：淡出后收起浮动视觉
     fadeRef.current?.stop();
@@ -127,6 +125,22 @@ export default function FloatingJoystick({ onMove, onDoubleTap, heightRatio = 0.
         setStick(null);
       }
     });
+  }
+
+  /** 正常松手：先做双击判定，再复位淡出（terminate 与续杆中断只走 end） */
+  function release() {
+    if (activeRef.current === null) return;
+    // 双击判定：轻触（未拖动、按压未超时）且距上次轻触 < DOUBLE_TAP_MS
+    if (!movedRef.current && Date.now() - downAtRef.current < TAP_HOLD_MS) {
+      const now = Date.now();
+      if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+        onDoubleTapRef.current?.();
+        lastTapRef.current = 0;
+      } else {
+        lastTapRef.current = now;
+      }
+    }
+    end();
   }
 
   return (

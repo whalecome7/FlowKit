@@ -72,6 +72,15 @@ export default function ButtonDrawer({ actions, palette }: Props) {
     ]).start();
   }, [open, maskAnim, panelAnim]);
 
+  // 卸载：停止可能挂起的开/关动画
+  useEffect(
+    () => () => {
+      maskAnim.stopAnimation();
+      panelAnim.stopAnimation();
+    },
+    [maskAnim, panelAnim],
+  );
+
   // 把手：点击或上滑打开（memo 持久化，闭包经 openRef 取最新态）
   const handleResponder = useMemo(
     () =>

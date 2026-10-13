@@ -187,4 +187,30 @@ describe('ButtonDrawer', () => {
       tree.unmount();
     });
   });
+
+  it('面板下拉超过阈值（>40dp）触发关闭，动画完成后面板卸载', async () => {
+    const tree = await renderDrawer(makeActions());
+    await tapHandle(tree);
+    expect(hostNodes(tree, 'drawer-panel').length).toBe(1);
+
+    const panel = hostNodes(tree, 'drawer-panel')[0];
+    // 模拟面板 responder 流程：move-should-set 协商 → grant → 下拉 55dp
+    const grantEvt = makeResponderEvent(200, 60, 1);
+    const moveEvt = makeResponderEvent(200, 115, 2, {
+      pageX: PAGE_OFFSET + 200,
+      pageY: PAGE_OFFSET + 60,
+    });
+    await ReactTestRenderer.act(() => {
+      panel.props.onMoveShouldSetResponder(grantEvt);
+      panel.props.onResponderGrant(grantEvt);
+      panel.props.onResponderMove(moveEvt);
+    });
+
+    // 关闭动画完成后卸载面板
+    await settle();
+    expect(hostNodes(tree, 'drawer-panel').length).toBe(0);
+    await ReactTestRenderer.act(() => {
+      tree.unmount();
+    });
+  });
 });

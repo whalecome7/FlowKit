@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     gap: 8,
-    zIndex: 20,
+    zIndex: 50,
   },
   bannerText: { color: '#7a5c10', fontSize: 12 },
   bannerRow: { flexDirection: 'row', gap: 6 },

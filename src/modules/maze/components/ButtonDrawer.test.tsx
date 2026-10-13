@@ -20,7 +20,7 @@ function makeActions() {
 }
 
 // PanResponder 包装层消费 touchHistory，事件须按 touchTrack 结构手工构造
-// （详见 FloatingJoystick.test.tsx 同一构造法）
+// （详见 useGameGestures.test.tsx 同一构造法）
 const PAGE_OFFSET = 400;
 
 const makeResponderEvent = (

@@ -87,3 +87,8 @@ export const BASE_CELL_DP = 12; // Svg 基础单元尺寸（缩放围绕它做 t
 export const INITIAL_CELL_DP = 10;
 export const MIN_SCALE_DP = 4;
 export const MAX_SCALE_DP = 22;
+
+/** 底部摇杆带高度（dp）：屏高的 26%，clamp [200, 260]（屏幕布局与手势分区共用） */
+export function joystickZoneHeight(windowHeight: number): number {
+  return Math.min(260, Math.max(200, 0.26 * windowHeight));
+}

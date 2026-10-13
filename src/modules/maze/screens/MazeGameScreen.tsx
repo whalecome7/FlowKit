@@ -1,19 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BASE_CELL_DP, DIFFS, paletteForSeed, TRAIL_STYLE_LABEL } from '../constants';
+import {
+  BASE_CELL_DP,
+  DIFFS,
+  joystickZoneHeight,
+  paletteForSeed,
+  TRAIL_STYLE_LABEL,
+} from '../constants';
 import BallView from '../components/BallView';
 import MazeSvg from '../components/MazeSvg';
 import Minimap from '../components/Minimap';
 import TrailLayer from '../components/TrailLayer';
 import HudBar from '../components/HudBar';
-import FloatingJoystick from '../components/FloatingJoystick';
+import JoystickView from '../components/JoystickView';
+import type { JoystickViewHandle } from '../components/JoystickView';
 import ButtonDrawer from '../components/ButtonDrawer';
 import { SeedModal, ViewBanner, WinModal } from '../components/GameModals';
 import { useGameEngine } from '../hooks/useGameEngine';
+import { useGameGestures } from '../hooks/useGameGestures';
 import { findShortestPath, generateMaze } from '../services/generator';
 import { addHistoryRecord, loadBest, upsertBest } from '../services/storage';
 import { decodeTrail, encodeTrail } from '../services/trailCodec';
@@ -111,15 +119,9 @@ export default function MazeGameScreen() {
 
   const bestText = best[difficulty] ? fmtTime(best[difficulty]!.timeMs) : '--';
 
-  const viewportRef = useRef<View>(null);
-  const viewportOriginRef = useRef({ x: 0, y: 0 });
-
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setViewport({ width, height });
-    viewportRef.current?.measureInWindow((x, y) => {
-      viewportOriginRef.current = { x, y };
-    });
   };
 
   const ballRef = useRef<View>(null);
@@ -130,10 +132,6 @@ export default function MazeGameScreen() {
   const [miniSnap, setMiniSnap] = useState({ ball: { x: 0, y: 0 }, view: { x: 0, y: 0, w: 0, h: 0 } });
   const [hint, setHint] = useState('');
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragRef = useRef<{ x: number; y: number } | null>(null);
-  const pinchRef = useRef<{ d: number } | null>(null);
-  const lastTapRef = useRef(0);
-  const movedSinceGrantRef = useRef(false);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 澄清待落地标记：cellPxState 更新后在同一 effect 中调用 applySettle（与 camScale 成对生效） */
   const settlePendingRef = useRef(false);
@@ -185,6 +183,37 @@ export default function MazeGameScreen() {
   });
   const engineRef = useRef(engine);
   engineRef.current = engine;
+
+  /** 缩放澄清调度：镜头触摸清空后 250ms 计算目标 cellPx（与 applySettle 成对落地） */
+  const scheduleSettle = useCallback(() => {
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => {
+      settleTimerRef.current = null;
+      const px = engineRef.current.settleZoom();
+      if (px) {
+        settlePendingRef.current = true;
+        setCellPxState(px);
+      }
+    }, 250);
+  }, []);
+
+  // 统一手势层：整个游戏区（viewport + 摇杆带）单 PanResponder——按下按区域分配归属，
+  // 带内=摇杆（写 joyRef）、迷宫区=镜头（引擎 pan/zoomAt）；拖到任何区域都继续原逻辑。
+  const joystickViewRef = useRef<JoystickViewHandle>(null);
+  const joyZoneHeight = joystickZoneHeight(Dimensions.get('window').height);
+  const gesture = useGameGestures({
+    onJoystickVector: (v) => {
+      joyRef.current = v;
+    },
+    joystickRef: joystickViewRef,
+    cam: {
+      manual: () => engineRef.current.manual(),
+      pan: (dx, dy) => engineRef.current.pan(dx, dy),
+      zoomAt: (x, y, f) => engineRef.current.zoomAt(x, y, f),
+      followBall: () => engineRef.current.followBall(),
+    },
+    onCameraIdle: scheduleSettle,
+  });
 
   // cellPx 同步：澄清待落地时在同一 effect 中调用 applySettle（camScale 归 1 + 重写视图），
   // 使 cellPx 与 camScale 成对生效，消除 1-2 帧断拍抖动
@@ -295,100 +324,8 @@ export default function MazeGameScreen() {
     [trailStyle, newMaze, restart, cycleTrailStyle, navigation, showHint],
   );
 
-  // 手势：单指平移 / 双指缩放 / 双击回跟随；手势结束后 250ms 澄清缩放
-  const gesture = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (evt) => {
-          if (settleTimerRef.current) {
-            clearTimeout(settleTimerRef.current);
-            settleTimerRef.current = null;
-          }
-          const now = Date.now();
-          if (now - lastTapRef.current < 300 && !movedSinceGrantRef.current) {
-            engineRef.current.followBall();
-            lastTapRef.current = 0;
-            dragRef.current = null;
-            pinchRef.current = null;
-            movedSinceGrantRef.current = false;
-            return;
-          }
-          lastTapRef.current = now;
-          movedSinceGrantRef.current = false;
-          const touches = evt.nativeEvent.touches;
-          if (touches.length >= 2) {
-            pinchRef.current = {
-              d: Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY),
-            };
-          } else if (touches.length === 1) {
-            dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
-          }
-        },
-        onPanResponderMove: (evt) => {
-          movedSinceGrantRef.current = true;
-          const touches = evt.nativeEvent.touches;
-          if (touches.length >= 2) {
-            if (!pinchRef.current) {
-              // 第二指刚落下：以当前两指距离为基准启动捏合，并中止拖动
-              pinchRef.current = {
-                d: Math.hypot(
-                  touches[0].pageX - touches[1].pageX,
-                  touches[0].pageY - touches[1].pageY,
-                ),
-              };
-              dragRef.current = null;
-              movedSinceGrantRef.current = true;
-            }
-            const d = Math.hypot(
-              touches[0].pageX - touches[1].pageX,
-              touches[0].pageY - touches[1].pageY,
-            );
-            if (pinchRef.current.d > 0) {
-              engineRef.current.zoomAt(
-                (touches[0].pageX + touches[1].pageX) / 2 - viewportOriginRef.current.x,
-                (touches[0].pageY + touches[1].pageY) / 2 - viewportOriginRef.current.y,
-                d / pinchRef.current.d,
-              );
-            }
-            pinchRef.current.d = d;
-            engineRef.current.manual();
-          } else if (touches.length === 1) {
-            if (pinchRef.current) {
-              // 松开一指回到单指：重置捏合，把剩余手指作为拖动起点
-              pinchRef.current = null;
-              dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
-              return;
-            }
-            if (dragRef.current) {
-              const dx = touches[0].pageX - dragRef.current.x;
-              const dy = touches[0].pageY - dragRef.current.y;
-              engineRef.current.pan(dx, dy);
-              dragRef.current = { x: touches[0].pageX, y: touches[0].pageY };
-              engineRef.current.manual();
-            }
-          }
-        },
-        onPanResponderRelease: endGesture,
-        onPanResponderTerminate: endGesture,
-      }),
-    [],
-  );
-
-  function endGesture() {
-    dragRef.current = null;
-    pinchRef.current = null;
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    settleTimerRef.current = setTimeout(() => {
-      settleTimerRef.current = null;
-      const px = engineRef.current.settleZoom();
-      if (px) {
-        settlePendingRef.current = true;
-        setCellPxState(px);
-      }
-    }, 250);
-  }
+  // 手势：单指平移 / 双指缩放 / 双击回跟随（统一手势层见上方 useGameGestures；
+  // 手势结束后 250ms 澄清缩放，见 scheduleSettle）
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -402,59 +339,62 @@ export default function MazeGameScreen() {
         onPickDifficulty={pickDifficulty}
         onPressSeed={() => setSeedModal(true)}
       />
-      <View ref={viewportRef} style={styles.viewport} onLayout={onLayout} {...gesture.panHandlers}>
-        {viewport.width > 0 && (
-          <View ref={containerRef} style={styles.world}>
-            <MazeSvg maze={maze} palette={palette} cellPx={cellPxState} />
-            <TrailLayer
-              maze={maze}
-              cellPx={cellPxState}
-              palette={palette}
-              trailStyle={trailStyle}
-              trail={trailSnapshot}
-              ghost={ghost}
-              shortestPath={shortestPath}
-            />
-          </View>
-        )}
-        <BallView ref={ballRef} />
-        <Minimap
-          maze={maze}
-          trail={trailSnapshot}
-          ballWorld={miniSnap.ball}
-          viewportWorld={miniSnap.view}
-          onJump={(gx, gy) => engineRef.current.jumpTo(gx * 2 + 0.5, gy * 2 + 0.5)}
-        />
-        <ViewBanner
-          visible={viewingRecord !== null}
-          text={
-            viewingRecord
-              ? `🔍 历史迷宫 · ${DIFFS[viewingRecord.difficulty].label} · 当年 ${fmtTime(viewingRecord.timeMs)} / ${viewingRecord.steps} 步`
-              : ''
-          }
-          pathShown={showShortest}
-          palette={palette}
-          onTogglePath={() => setShowShortest((v) => !v)}
-          onRechallenge={resetAndBump}
-          onClose={() => {
-            setViewingRecord(null);
-            setShowShortest(false);
-          }}
-        />
-        {hint !== '' && (
-          <View style={styles.hintWrap} pointerEvents="none">
-            <Text style={styles.hintText}>{hint}</Text>
-          </View>
-        )}
-      </View>
-      {/* 摇杆带：迷宫视口之下的固定留白区（常驻摇杆居中），迷宫不占满全屏 */}
-      <View style={styles.joyZoneWrap}>
-        <FloatingJoystick
-          onMove={(v) => {
-            joyRef.current = v;
-          }}
-          onDoubleTap={() => engineRef.current.followBall()}
-        />
+      {/* 统一手势区：viewport（迷宫+镜头）与底部摇杆带共用一个 PanResponder，
+          触摸在按下瞬间按区域分配归属（带内=摇杆、迷宫区=镜头），拖动中不换目标 */}
+      <View
+        style={styles.region}
+        ref={gesture.regionRef}
+        onLayout={gesture.onRegionLayout}
+        {...gesture.regionHandlers}>
+        <View style={styles.viewport} onLayout={onLayout}>
+          {viewport.width > 0 && (
+            <View ref={containerRef} style={styles.world}>
+              <MazeSvg maze={maze} palette={palette} cellPx={cellPxState} />
+              <TrailLayer
+                maze={maze}
+                cellPx={cellPxState}
+                palette={palette}
+                trailStyle={trailStyle}
+                trail={trailSnapshot}
+                ghost={ghost}
+                shortestPath={shortestPath}
+              />
+            </View>
+          )}
+          <BallView ref={ballRef} />
+          <Minimap
+            maze={maze}
+            trail={trailSnapshot}
+            ballWorld={miniSnap.ball}
+            viewportWorld={miniSnap.view}
+            onJump={(gx, gy) => engineRef.current.jumpTo(gx * 2 + 0.5, gy * 2 + 0.5)}
+          />
+          <ViewBanner
+            visible={viewingRecord !== null}
+            text={
+              viewingRecord
+                ? `🔍 历史迷宫 · ${DIFFS[viewingRecord.difficulty].label} · 当年 ${fmtTime(viewingRecord.timeMs)} / ${viewingRecord.steps} 步`
+                : ''
+            }
+            pathShown={showShortest}
+            palette={palette}
+            onTogglePath={() => setShowShortest((v) => !v)}
+            onRechallenge={resetAndBump}
+            onClose={() => {
+              setViewingRecord(null);
+              setShowShortest(false);
+            }}
+          />
+          {hint !== '' && (
+            <View style={styles.hintWrap} pointerEvents="none">
+              <Text style={styles.hintText}>{hint}</Text>
+            </View>
+          )}
+        </View>
+        {/* 摇杆带：迷宫视口之下的固定留白区（常驻摇杆居中），触摸归摇杆逻辑 */}
+        <View style={{ height: joyZoneHeight }}>
+          <JoystickView ref={joystickViewRef} />
+        </View>
       </View>
       {/* 抽屉置于根层：容器覆盖全屏（遮罩可盖住 HUD 与迷宫），box-none 透传底层触摸 */}
       <ButtonDrawer actions={drawerActions} palette={palette} />
@@ -484,11 +424,9 @@ export default function MazeGameScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  // 统一手势区：viewport（flex:1）+ 底部摇杆带（高度由 joystickZoneHeight 动态计算）
+  region: { flex: 1 },
   viewport: { flex: 1, overflow: 'hidden' },
-  // 摇杆带高度：26% 屏高，clamp [200, 260]（含常驻摇杆与底部留白）
-  joyZoneWrap: {
-    height: Math.min(260, Math.max(200, 0.26 * Dimensions.get('window').height)),
-  },
   world: { position: 'absolute', left: 0, top: 0 },
   hintWrap: { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center', zIndex: 50 },
   hintText: {

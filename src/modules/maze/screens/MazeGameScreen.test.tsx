@@ -3,14 +3,24 @@ import ReactTestRenderer from 'react-test-renderer';
 import { Text } from 'react-native';
 import { ThemeProvider } from '../../../theme';
 import MazeGameScreen from './MazeGameScreen';
-import FloatingJoystick from '../components/FloatingJoystick';
 import { generateMaze } from '../services/generator';
 import { useMazeStore } from '../store';
+import type { RegionApi } from '../hooks/useGameGestures';
 import type { CellPoint, HistoryRecord } from '../types';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest'),
 );
+
+// 统一手势层 mock：手势分配逻辑由其单测覆盖；屏幕测试只需捕获屏幕传入的 api，
+// 用 capturedApi.onJoystickVector 直驱引擎（等价旧 FloatingJoystick.props.onMove 链路）。
+let mockCapturedApi: RegionApi | null = null;
+jest.mock('../hooks/useGameGestures', () => ({
+  useGameGestures: (api: RegionApi) => {
+    mockCapturedApi = api;
+    return { regionHandlers: {}, regionRef: { current: null }, onRegionLayout: jest.fn() };
+  },
+}));
 
 // 屏幕依赖 useNavigation/useRoute（T17 历史查看模式）；本测试不包裹 NavigationContainer，按最小面 mock。
 // mockParams 可变：模拟「从历史页二次进入」时 route.params 由无到有（tree.update 前先赋值再触发渲染）。
@@ -84,6 +94,7 @@ describe('MazeGameScreen', () => {
   beforeEach(() => {
     useMazeStore.setState(useMazeStore.getInitialState(), true);
     mockParams = undefined;
+    mockCapturedApi = null;
     mockNavigate.mockClear();
     mockSetParams.mockClear();
   });
@@ -131,10 +142,10 @@ describe('MazeGameScreen', () => {
         viewportNode.props.onLayout({ nativeEvent: { layout: { width: 300, height: 500 } } });
       });
 
-      // 通过屏幕渲染的 FloatingJoystick 实例写摇杆（其 onMove 即屏幕写 joyRef 的回调）。
+      // 经 mock 捕获的 api 写摇杆（onJoystickVector 即屏幕写 joyRef 的回调，等价旧 onMove 链路）。
       // 默认 store（seed 1000000 / easy，起点 [2,10]）向右是通道：推 {x:1,y:0}
-      const joystick = tree.root.findByType(FloatingJoystick);
-      joystick.props.onMove({ x: 1, y: 0 });
+      expect(mockCapturedApi).not.toBeNull();
+      mockCapturedApi!.onJoystickVector({ x: 1, y: 0 });
       // 推进 30 帧让引擎真实跑 moveBall/onEnterCell，球移动出起步格产生轨迹
       await stepFrames(30);
 
@@ -143,7 +154,7 @@ describe('MazeGameScreen', () => {
       expect(playedTrail.length).toBeGreaterThan(1);
       expect(useMazeStore.getState().steps).toBeGreaterThan(0);
       // 松手停杆（模拟用户放手后去历史页）
-      joystick.props.onMove({ x: 0, y: 0 });
+      mockCapturedApi!.onJoystickVector({ x: 0, y: 0 });
 
       // 二次进入相同 seed/difficulty 的记录（maze 引用不变）：缺 resetToken bump 时引擎与轨迹都不会重置
       const { difficulty, seed } = useMazeStore.getState();

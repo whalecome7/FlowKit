@@ -3,7 +3,6 @@ import {
   AGE_UNIT,
   GROUP_SIZE,
   LIVE_STEP,
-  RAINBOW_BUCKETS,
   advanceTo,
   blockAlive,
   buildBlock,
@@ -62,15 +61,18 @@ describe('liveTrail 样式', () => {
     expect(segStyleAt(MONO, 999, 0)).toEqual({ color: '#123456', opacity: 1 });
   });
 
-  it('rainbow：按起点累计长度分 12 桶（每 AGE_UNIT 走 15°）', () => {
-    expect(segStyleAt(RAINBOW, 0, 100).color).toBe(RAINBOW_BUCKETS[0]);
-    expect(segStyleAt(RAINBOW, 0.5 * AGE_UNIT, 100).color).toBe(RAINBOW_BUCKETS[0]); // hue 7.5
-    expect(segStyleAt(RAINBOW, 2 * AGE_UNIT, 100).color).toBe(RAINBOW_BUCKETS[1]); // hue 30
-    expect(segStyleAt(RAINBOW, 4 * AGE_UNIT, 100).color).toBe(RAINBOW_BUCKETS[2]); // hue 60
-    // 48 单位一圈（360°）回到 0 号桶
-    expect(segStyleAt(RAINBOW, 24 * AGE_UNIT, 100).color).toBe(RAINBOW_BUCKETS[0]);
-    // 与实际起点距离无关（headLen 不影响 hue）
-    expect(segStyleAt(RAINBOW, 2 * AGE_UNIT, 999).color).toBe(RAINBOW_BUCKETS[1]);
+  it('rainbow：按起点累计长度连续渐变色相（每 AGE_UNIT 走 15°，衔接无台阶）', () => {
+    expect(segStyleAt(RAINBOW, 0, 100).color).toBe('hsl(0, 85%, 52%)');
+    expect(segStyleAt(RAINBOW, 0.5 * AGE_UNIT, 100).color).toBe('hsl(7.5, 85%, 52%)');
+    expect(segStyleAt(RAINBOW, 2 * AGE_UNIT, 100).color).toBe('hsl(30, 85%, 52%)');
+    expect(segStyleAt(RAINBOW, 4 * AGE_UNIT, 100).color).toBe('hsl(60, 85%, 52%)');
+    // 一圈（24 × AGE_UNIT = 48 世界单位）回绕
+    expect(segStyleAt(RAINBOW, 24 * AGE_UNIT, 100).color).toBe('hsl(0, 85%, 52%)');
+    // 相邻采样点（LIVE_STEP=0.08 世界单位，色相差 0.6°）颜色连续变化——无量化桶
+    expect(segStyleAt(RAINBOW, 1, 100).color).toBe('hsl(7.5, 85%, 52%)');
+    expect(segStyleAt(RAINBOW, 1.08, 100).color).toBe('hsl(8.1, 85%, 52%)');
+    // 与头部距离无关（headLen 不影响 hue）
+    expect(segStyleAt(RAINBOW, 2 * AGE_UNIT, 999).color).toBe('hsl(30, 85%, 52%)');
   });
 
   it('fade：按距头部长度 8 档衰减，低于 cutoff 返回 0', () => {

@@ -54,6 +54,8 @@ function LiveTrailLayerInner(
   const dotRefs = useRef<(View | null)[]>(Array(LIVE_SLOTS).fill(null));
   /** 各槽最近写入的透明度：fade 跨档检查用（避免每帧盲写全窗口） */
   const lastOpacityRef = useRef<number[]>(Array(LIVE_SLOTS).fill(-1));
+  /** 待清点槽（冻结后由静态块接管）：等 blocks 渲染落定再清，避免"点先消失、块未出现"的闪烁 */
+  const pendingClearRef = useRef<number[]>([]);
   const specRef = useRef<LiveStyleSpec>({ trailStyle, monoColor: palette.wallDark });
   specRef.current = { trailStyle, monoColor: palette.wallDark };
   const cellPxRef = useRef(cellPx);
@@ -107,9 +109,10 @@ function LiveTrailLayerInner(
         .map((b) => buildBlock(s, b.from, b.to, spec, headLen));
     }
     setBlocks(blocksRef.current);
-    // 清掉刚冻结的点槽（显示由静态块接管）：消除残影与静态块在色桶/位置上的任何微差
+    // 刚冻结的点槽标记待清（显示由静态块接管）：不在此刻同步清——
+    // 否则"点消失"早于"块渲染出现"（React 渲染晚 1-2 帧），在冻结边界闪一下
     for (let k = from; k < to; k++) {
-      writeDot(k % LIVE_SLOTS, 0, 0, { color: spec.monoColor, opacity: 0 });
+      pendingClearRef.current.push(k);
     }
   };
 
@@ -191,6 +194,25 @@ function LiveTrailLayerInner(
     resetTo(2 * maze.start[0] + 1.5, 2 * maze.start[1] + 1.5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maze]);
+
+  // 块渲染落定后再清接管槽：blocks 经 React commit 后再等一帧（原生绘制完成），
+  // 此时"块已出现"，撤掉同位置的点无可感知变化（消除冻结边界闪烁）
+  useEffect(() => {
+    if (pendingClearRef.current.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      const spec = specRef.current;
+      const list = pendingClearRef.current;
+      pendingClearRef.current = [];
+      for (const k of list) {
+        // 防御：仅清仍属冻结区的槽（未被更新的点复用覆盖）
+        if (k < frozenRef.current) {
+          writeDot(k % LIVE_SLOTS, 0, 0, { color: spec.monoColor, opacity: 0 });
+        }
+      }
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
 
   // cellPx 变化（布局/缩放澄清落地）：点槽为像素直写需全量重写；静态块经 viewBox 与像素解耦
   useEffect(() => {

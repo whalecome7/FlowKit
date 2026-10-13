@@ -53,30 +53,6 @@ export interface LivePathState {
   lens: number[];
 }
 
-function hslToHex(h: number, s: number, l: number): string {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = h / 60;
-  const x = c * (1 - Math.abs((hp % 2) - 1));
-  let rgb: [number, number, number];
-  if (hp < 1) rgb = [c, x, 0];
-  else if (hp < 2) rgb = [x, c, 0];
-  else if (hp < 3) rgb = [0, c, x];
-  else if (hp < 4) rgb = [0, x, c];
-  else if (hp < 5) rgb = [x, 0, c];
-  else rgb = [c, 0, x];
-  const m = l - c / 2;
-  const toHex = (v: number) =>
-    Math.round((v + m) * 255)
-      .toString(16)
-      .padStart(2, '0');
-  return `#${toHex(rgb[0])}${toHex(rgb[1])}${toHex(rgb[2])}`;
-}
-
-/** 12 个彩虹桶中心色（hue = 15 + 30k），与原格折线同款 */
-export const RAINBOW_BUCKETS: string[] = Array.from({ length: 12 }, (_, k) =>
-  hslToHex(15 + 30 * k, 0.85, 0.52),
-);
-
 export function createLivePath(x: number, y: number): LivePathState {
   return { xs: [x], ys: [y], lens: [0] };
 }
@@ -104,7 +80,8 @@ export function advanceTo(s: LivePathState, x: number, y: number): number {
 }
 
 /**
- * 段样式：mono 单色全亮；rainbow 按"起点累计长度"分 12 桶（每 AGE_UNIT 走 15°）；
+ * 段/点样式：mono 单色全亮；rainbow 按"起点累计长度"**连续渐变**色相
+ * （每 AGE_UNIT 走 15°，0.1° 量化——点池逐点更新，相邻点色差 < 1°，衔接处无台阶）；
  * fade 按"距头部长度"8 档衰减（α = 0.78^(age/AGE_UNIT)），低于 cutoff 返回 0 表示不画。
  */
 export function segStyleAt(spec: LiveStyleSpec, lenPos: number, headLen: number): SegStyle {
@@ -115,8 +92,8 @@ export function segStyleAt(spec: LiveStyleSpec, lenPos: number, headLen: number)
     const step = Math.min(FADE_STEPS - 1, Math.floor(alpha * FADE_STEPS));
     return { color: spec.monoColor, opacity: (step + 1) / FADE_STEPS };
   }
-  const hue = ((lenPos / AGE_UNIT) * 15) % 360;
-  return { color: RAINBOW_BUCKETS[Math.floor(hue / 30) % 12], opacity: 1 };
+  const hue = Math.round((((lenPos / AGE_UNIT) * 15) % 360) * 10) / 10;
+  return { color: `hsl(${hue}, 85%, 52%)`, opacity: 1 };
 }
 
 /**

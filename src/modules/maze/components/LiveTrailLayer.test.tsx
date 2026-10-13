@@ -131,7 +131,7 @@ describe('LiveTrailLayer（球真实路径圆点链）', () => {
     });
   });
 
-  it('冻结：未冻结点数达 FREEZE_AT 批量转静态块（Svg Path）并清接管槽；reset 全清', async () => {
+  it('冻结：未冻结点数达 FREEZE_AT 转静态块（Svg Path），接管槽延迟清空（防边界闪烁）；reset 全清', async () => {
     const { tree, ref } = renderLayer('mono');
     const dot0 = installNativeMock(tree, 'trail-dot-0');
 
@@ -143,7 +143,12 @@ describe('LiveTrailLayer（球真实路径圆点链）', () => {
     });
     // 点数 floor(7.7/0.08)=96 → 触发冻结 [0,48)：48 段 / 16 = 3 组 → 3 Path
     expect(tree.root.findAllByType(Path)).toHaveLength(3);
-    // 点 0（槽 0）已被静态块接管并清空
+    // 冻结刚发生时点槽暂未清（点与静态块并存于冻结区，防"点先消失、块未渲染"的闪烁）
+    expect(lastStyle(dot0).opacity).not.toBe(0);
+    // 块渲染落定（commit + 一帧）后，接管槽被清空
+    await ReactTestRenderer.act(async () => {
+      await new Promise((resolve) => setTimeout(() => resolve(null), 50));
+    });
     expect(lastStyle(dot0).opacity).toBe(0);
 
     ReactTestRenderer.act(() => {

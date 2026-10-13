@@ -60,8 +60,8 @@ function TrailLayerInner({ maze, cellPx, palette, trailStyle, trail, ghost, shor
 
   const paths = useMemo(() => {
     if (trail.length < 2) return [] as { d: string; color: string; opacity: number }[];
-    // 最后一段由屏幕层的"实时尾巴线"绘制（跟随小球连续位置），静态层只画到倒数第二个格
-    const segs = buildSegments(trail.slice(0, -1), cellPx);
+    // 全段静态折线（到当前格中心）；"球离开格中心后的实时部分"由屏幕层的尾巴线绘制（格中心→球）
+    const segs = buildSegments(trail, cellPx);
     if (segs.length === 0) return [] as { d: string; color: string; opacity: number }[];
     if (trailStyle === 'mono') {
       return [{ d: segs.join(' '), color: palette.wallDark, opacity: 1 }];

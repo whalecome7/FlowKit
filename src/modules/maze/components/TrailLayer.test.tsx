@@ -51,7 +51,7 @@ describe('TrailLayer', () => {
     expect(tree.root.findAllByType(Path).length).toBeGreaterThanOrEqual(3);
   });
 
-  it('静态折线只画到倒数第二个格（最后一段由实时尾巴层负责）', async () => {
+  it('静态折线画满全程（到当前格中心；格中心→球的末段由实时尾巴线负责）', async () => {
     const trail = [
       [3, 3],
       [4, 3],
@@ -72,11 +72,11 @@ describe('TrailLayer', () => {
         />,
       );
     });
-    // 4 点轨迹完整应为 3 段；静态层去掉最后一段 → 全部 Path 的 "M " 合计 2
+    // 4 点轨迹完整应为 3 段（静态层画满；尾巴线只负责"格中心→球"的实时延长段）
     const mCount = tree.root
       .findAllByType(Path)
       .map((n) => ((n.props.d as string).match(/M /g) ?? []).length)
       .reduce((a, b) => a + b, 0);
-    expect(mCount).toBe(2);
+    expect(mCount).toBe(3);
   });
 });

@@ -161,7 +161,8 @@ export default function MazeGameScreen() {
     const c = engineRef.current.getCam();
     const k = cellPxRef.current * engineRef.current.getCamScale();
     const trail = trailRef.current;
-    const anchor = trail.length >= 2 ? trail[trail.length - 2] : trail[trail.length - 1];
+    // 锚点为"球当前格中心"：格中心→球恒在"格 + 其归属通道"的正交通路内，直线永不穿墙角
+    const anchor = trail[trail.length - 1];
     if (!anchor) return;
     const p1x = (2 * anchor[0] + 1.5 - c.x) * k + viewport.width / 2;
     const p1y = (2 * anchor[1] + 1.5 - c.y) * k + viewport.height / 2;

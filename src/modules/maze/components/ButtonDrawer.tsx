@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     position: 'absolute',
-    bottom: 34, // 更高，避开系统手势条
+    bottom: 24, // 避开系统手势条（用户微调下移）
     alignSelf: 'center',
     width: 96,
     height: 24,

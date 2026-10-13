@@ -69,7 +69,7 @@ describe('JoystickView（纯视觉 imperative 组件）', () => {
     layout(300, 200);
     expect(lastStyle(baseMock)).toMatchObject({
       left: 300 / 2 - 64, // 86
-      top: 200 / 2 - 64, // 36
+      top: 200 / 2 - 20 - 64, // 16（上移 20 常驻偏移）
       marginLeft: 0,
       marginTop: 0,
       opacity: 0.55,
@@ -111,7 +111,7 @@ describe('JoystickView（纯视觉 imperative 组件）', () => {
     });
     expect(lastStyle(baseMock)).toMatchObject({
       left: 86,
-      top: 36,
+      top: 16,
       opacity: 0.55,
     });
     expect(lastStyle(knobMock).transform).toEqual([
@@ -134,7 +134,7 @@ describe('JoystickView（纯视觉 imperative 组件）', () => {
     });
     expect(lastStyle(baseMock)).toMatchObject({
       left: 400 / 2 - 64, // 136
-      top: 300 / 2 - 64, // 86
+      top: 300 / 2 - 20 - 64, // 66
       opacity: 0.55,
     });
   });

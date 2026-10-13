@@ -5,6 +5,8 @@ import { StyleSheet, View } from 'react-native';
 const IDLE_OPACITY = 0.55;
 /** 底座半径（128dp 直径） */
 const BASE_R = 64;
+/** 常驻位相对纵向中心的上移量（dp）：给把手留出空间 */
+const REST_OFFSET_Y = 20;
 /** 旋钮直径（dp） */
 const KNOB_D = 56;
 
@@ -30,7 +32,7 @@ export interface JoystickViewHandle {
 const JoystickView = forwardRef<JoystickViewHandle, {}>((_props, ref) => {
   const baseRef = useRef<View>(null);
   const knobRef = useRef<View>(null);
-  /** 自身尺寸（onLayout 记录）：常驻位中心 = (w/2, h/2) */
+  /** 自身尺寸（onLayout 记录）：常驻位中心 = (w/2, h/2 - REST_OFFSET_Y) */
   const sizeRef = useRef({ w: 0, h: 0 });
   /** 底座当前是否被 show() 唤出（onLayout 重触发时不打扰进行中的拖动） */
   const shownRef = useRef(false);
@@ -41,7 +43,7 @@ const JoystickView = forwardRef<JoystickViewHandle, {}>((_props, ref) => {
     baseRef.current?.setNativeProps({
       style: {
         left: w / 2 - BASE_R,
-        top: h / 2 - BASE_R,
+        top: h / 2 - REST_OFFSET_Y - BASE_R,
         marginLeft: 0,
         marginTop: 0,
         opacity: IDLE_OPACITY,
@@ -105,7 +107,7 @@ const styles = StyleSheet.create({
     left: '50%',
     top: '50%',
     marginLeft: -BASE_R,
-    marginTop: -BASE_R,
+    marginTop: -BASE_R - REST_OFFSET_Y,
     width: BASE_R * 2,
     height: BASE_R * 2,
     borderRadius: BASE_R,

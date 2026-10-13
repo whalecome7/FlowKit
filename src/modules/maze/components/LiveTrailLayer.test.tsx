@@ -66,6 +66,26 @@ describe('LiveTrailLayer（球真实路径采样层）', () => {
     });
   });
 
+  it('挂载即以迷宫起点初始化：首个采样段从起点出发（不拉出世界原点长线）', async () => {
+    const { tree, ref } = renderLayer('mono');
+    const seg0 = installNativeMock(tree, 'trail-seg-0');
+    const sx = 2 * maze.start[0] + 1.5;
+    const sy = 2 * maze.start[1] + 1.5;
+
+    ReactTestRenderer.act(() => {
+      ref.current!.tick(sx + 1, sy); // 球自起点移动 1 世界单位（未先调 reset）
+    });
+
+    const st = lastStyle(seg0);
+    expect(st.width as number).toBeCloseTo(12, 6); // 段长 1 世界单位 × cellPx
+    expect(st.left as number).toBeCloseTo((sx + 0.5) * 12 - 6, 6);
+    expect(st.top as number).toBeCloseTo(sy * 12 - 0.24 * 12 / 2, 6);
+
+    await ReactTestRenderer.act(() => {
+      tree.unmount();
+    });
+  });
+
   it('tick 追加采样点：完整段直写槽（世界→容器像素、颜色/旋转正确）', async () => {
     const { tree, ref } = renderLayer('mono');
     const seg0 = installNativeMock(tree, 'trail-seg-0');

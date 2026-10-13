@@ -153,16 +153,21 @@ function LiveTrailLayerInner(
     );
   };
 
+  /** 重置为单起点：清空静态块与全部段槽（handle.reset 与挂载初始化共用） */
+  const resetTo = (x: number, y: number) => {
+    stateRef.current = createLivePath(x, y);
+    frozenRef.current = 0;
+    blocksRef.current = [];
+    ballRef.current = { x, y };
+    setBlocks([]);
+    for (let i = 0; i < LIVE_SLOTS; i++) {
+      writeSeg(i, 0, 0, 0, 0, { color: specRef.current.monoColor, opacity: 0 });
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     reset(x, y) {
-      stateRef.current = createLivePath(x, y);
-      frozenRef.current = 0;
-      blocksRef.current = [];
-      ballRef.current = { x, y };
-      setBlocks([]);
-      for (let i = 0; i < LIVE_SLOTS; i++) {
-        writeSeg(i, 0, 0, 0, 0, { color: specRef.current.monoColor, opacity: 0 });
-      }
+      resetTo(x, y);
     },
     tick(x, y) {
       ballRef.current = { x, y };
@@ -213,6 +218,14 @@ function LiveTrailLayerInner(
       redrawWindow();
     },
   }));
+
+  // 挂载/换迷宫：以起点初始化采样。
+  // 本组件挂在 world 容器内（viewport 布局落定才渲染），挂载晚于屏幕初始化 effect——
+  // 若只依赖外部 imperative reset，会以初始 (0,0) 存活导致首帧拉出跨图长线。
+  useEffect(() => {
+    resetTo(2 * maze.start[0] + 1.5, 2 * maze.start[1] + 1.5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maze]);
 
   // cellPx 变化（布局/缩放澄清落地）：段为像素直写需全量重写；静态块经 viewBox 与像素解耦
   useEffect(() => {

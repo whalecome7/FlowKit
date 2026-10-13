@@ -4,10 +4,10 @@ import {
   GROUP_SIZE,
   LIVE_STEP,
   RAINBOW_BUCKETS,
+  advanceTo,
   blockAlive,
   buildBlock,
   createLivePath,
-  pushPoint,
   segStyleAt,
 } from './liveTrail';
 import type { LiveStyleSpec } from './liveTrail';
@@ -16,32 +16,43 @@ const MONO: LiveStyleSpec = { trailStyle: 'mono', monoColor: '#123456' };
 const RAINBOW: LiveStyleSpec = { trailStyle: 'rainbow', monoColor: '#000000' };
 const FADE: LiveStyleSpec = { trailStyle: 'fade', monoColor: '#111111' };
 
-/** 沿 +x 逐点采样，间距 step（+1e-12 防浮点差 0.079999… 被阈值拦截） */
+/** 沿 +x 逐点采样（advanceTo 补点，步长恒为 LIVE_STEP） */
 function samplePath(count: number, step = LIVE_STEP) {
   const s = createLivePath(0, 0);
-  let x = 0;
-  for (let i = 1; i < count; i++) {
-    x += step + 1e-12;
-    pushPoint(s, x, 0);
-  }
+  advanceTo(s, (count - 1) * step + 1e-9, 0);
   return s;
 }
 
-describe('liveTrail 采样', () => {
-  it('pushPoint：距离 < LIVE_STEP 不追加；≥ LIVE_STEP 追加并累计 lens', () => {
-    const s = createLivePath(1, 1);
-    expect(pushPoint(s, 1 + LIVE_STEP * 0.5, 1)).toBe(false);
+describe('liveTrail 采样（advanceTo 插值补点）', () => {
+  it('按 LIVE_STEP 步长插值推进，返回本次追加点数', () => {
+    const s = createLivePath(0, 0);
+    expect(advanceTo(s, 0.05, 0)).toBe(0); // 不足一步
     expect(s.xs).toHaveLength(1);
-    expect(s.lens).toHaveLength(1);
 
-    expect(pushPoint(s, 3, 1)).toBe(true);
-    expect(s.xs).toEqual([1, 3]);
-    expect(s.ys).toEqual([1, 1]);
-    expect(s.lens).toEqual([0, 2]);
+    expect(advanceTo(s, 0.25, 0)).toBe(3); // 0.08 / 0.16 / 0.24，剩 0.01
+    expect(s.xs).toHaveLength(4);
+    expect(s.xs[1]).toBeCloseTo(0.08, 9);
+    expect(s.xs[2]).toBeCloseTo(0.16, 9);
+    expect(s.xs[3]).toBeCloseTo(0.24, 9);
+    expect(s.lens[3]).toBeCloseTo(0.24, 9);
 
-    // 斜向：lens 按欧氏距离累计
-    expect(pushPoint(s, 3 + 3, 1 + 4)).toBe(true);
-    expect(s.lens[2]).toBe(7);
+    // 继续推进：从 0.24 到 0.4 补 2 点
+    expect(advanceTo(s, 0.4, 0)).toBe(2);
+    expect(s.xs[5]).toBeCloseTo(0.4, 9);
+  });
+
+  it('斜向插值点严格落在连线上，相邻点距恒为 LIVE_STEP（快移自动拆点）', () => {
+    const s = createLivePath(1, 1);
+    const added = advanceTo(s, 4, 5); // 距离 5 → 62 点（5 / 0.08 = 62.5）
+    expect(added).toBe(62);
+    for (let k = 1; k <= 62; k++) {
+      const prev = k - 1;
+      expect(Math.hypot(s.xs[k] - s.xs[prev], s.ys[k] - s.ys[prev])).toBeCloseTo(LIVE_STEP, 9);
+    }
+    // 剩 0.04 < LIVE_STEP：末端不补点，球体自身覆盖（端点恒贴球）
+    const rem = Math.hypot(4 - s.xs[62], 5 - s.ys[62]);
+    expect(rem).toBeGreaterThan(0);
+    expect(rem).toBeLessThan(LIVE_STEP);
   });
 });
 

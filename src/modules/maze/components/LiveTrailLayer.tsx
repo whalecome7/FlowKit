@@ -6,10 +6,10 @@ import {
   FREEZE_AT,
   FREEZE_BATCH,
   LIVE_SLOTS,
+  advanceTo,
   blockAlive,
   buildBlock,
   createLivePath,
-  pushPoint,
   segStyleAt,
   type LivePathState,
   type LiveStyleSpec,
@@ -19,11 +19,11 @@ import {
 import type { MazeData, TrailStyle } from '../types';
 
 export interface LiveTrailHandle {
-  /** 换局/重开：重置为单起点，清空静态块与全部段槽 */
+  /** 换局/重开：重置为单起点，清空静态块与全部点槽 */
   reset(x: number, y: number): void;
-  /** 引擎 onTick 驱动（球世界坐标）；端点恒为球 */
+  /** 引擎 onTick 驱动（球世界坐标）；快移帧自动插值补点 */
   tick(x: number, y: number): void;
-  /** 轨迹样式/配色切换：重建静态块并重写显示中的段 */
+  /** 轨迹样式/配色切换：重建静态块并重写显示中的点 */
   restyle(): void;
 }
 
@@ -37,7 +37,9 @@ interface Props {
 /**
  * 实时轨迹层：球真实路径的连续折线（替代旧的"格中心折线 + 直线尾巴"近似）。
  * - 冻结部分：Svg（viewBox 世界坐标）——随容器变换自动跟随镜头，与像素尺寸解耦；
- * - 活跃部分：固定槽位 View 段池，环形复用，tick 只直写新增/末段槽（每帧 ≤2 次 setNativeProps）；
+ * - 活跃部分：固定槽位 View **圆点池**（环形复用）——只直写 left/top/尺寸/颜色/透明度，
+ *   刻意不做逐段旋转：Fabric 下 setNativeProps 直写 transform(rotate) 不生效（真机验证），
+ *   圆点以固定密度重叠成平滑线条（点距 LIVE_STEP ≪ 点直径），几何上无需旋转；
  * - 世界坐标 → 容器局部像素直写（×cellPx），镜头平移/缩放零重画。
  */
 function LiveTrailLayerInner(
@@ -49,8 +51,7 @@ function LiveTrailLayerInner(
   const stateRef = useRef<LivePathState>(createLivePath(0, 0));
   const frozenRef = useRef(0);
   const blocksRef = useRef<TrailBlock[]>([]);
-  const ballRef = useRef({ x: 0, y: 0 });
-  const segRefs = useRef<(View | null)[]>(Array(LIVE_SLOTS).fill(null));
+  const dotRefs = useRef<(View | null)[]>(Array(LIVE_SLOTS).fill(null));
   /** 各槽最近写入的透明度：fade 跨档检查用（避免每帧盲写全窗口） */
   const lastOpacityRef = useRef<number[]>(Array(LIVE_SLOTS).fill(-1));
   const specRef = useRef<LiveStyleSpec>({ trailStyle, monoColor: palette.wallDark });
@@ -58,24 +59,17 @@ function LiveTrailLayerInner(
   const cellPxRef = useRef(cellPx);
   cellPxRef.current = cellPx;
 
-  const segRefSetters = useMemo(
+  const dotRefSetters = useMemo(
     () =>
       Array.from({ length: LIVE_SLOTS }, (_, i) => (el: View | null) => {
-        segRefs.current[i] = el;
+        dotRefs.current[i] = el;
       }),
     [],
   );
 
-  /** 直写一段（槽 = 段号 % LIVE_SLOTS）：世界坐标 → 容器局部像素 */
-  const writeSeg = (
-    slot: number,
-    x0: number,
-    y0: number,
-    x1: number,
-    y1: number,
-    st: SegStyle,
-  ) => {
-    const v = segRefs.current[slot];
+  /** 直写一个圆点（槽 = 点号 % LIVE_SLOTS）：世界坐标 → 容器局部像素；无 transform */
+  const writeDot = (slot: number, x: number, y: number, st: SegStyle) => {
+    const v = dotRefs.current[slot];
     if (!v) return;
     lastOpacityRef.current[slot] = st.opacity;
     if (st.opacity <= 0) {
@@ -83,32 +77,21 @@ function LiveTrailLayerInner(
       return;
     }
     const k = cellPxRef.current;
-    const w = TRAIL_WIDTH * k;
-    const px0 = x0 * k;
-    const py0 = y0 * k;
-    const px1 = x1 * k;
-    const py1 = y1 * k;
-    const len = Math.hypot(px1 - px0, py1 - py0);
-    if (len < 0.5) {
-      v.setNativeProps({ style: { opacity: 0 } });
-      return;
-    }
-    const angle = (Math.atan2(py1 - py0, px1 - px0) * 180) / Math.PI;
+    const d = TRAIL_WIDTH * k;
     v.setNativeProps({
       style: {
         opacity: st.opacity,
-        left: (px0 + px1) / 2 - len / 2,
-        top: (py0 + py1) / 2 - w / 2,
-        width: len,
-        height: w,
-        borderRadius: w / 2,
+        left: x * k - d / 2,
+        top: y * k - d / 2,
+        width: d,
+        height: d,
+        borderRadius: d / 2,
         backgroundColor: st.color,
-        transform: [{ rotate: `${angle}deg` }],
       },
     });
   };
 
-  /** 冻结：段 [frozen, frozen + FREEZE_BATCH) 构建为静态块并前移冻结前沿 */
+  /** 冻结：点 [frozen, frozen + FREEZE_BATCH) 构建为静态块（折线含边界尾点）并前移冻结前沿 */
   const freeze = () => {
     const s = stateRef.current;
     const from = frozenRef.current;
@@ -124,45 +107,34 @@ function LiveTrailLayerInner(
         .map((b) => buildBlock(s, b.from, b.to, spec, headLen));
     }
     setBlocks(blocksRef.current);
+    // 清掉刚冻结的点槽（显示由静态块接管）：消除残影与静态块在色桶/位置上的任何微差
+    for (let k = from; k < to; k++) {
+      writeDot(k % LIVE_SLOTS, 0, 0, { color: spec.monoColor, opacity: 0 });
+    }
   };
 
-  /** 重写显示窗口内的段：完整段 [frozen, n-1] + 末段（最后采样点 → 球当前） */
-  const redrawWindow = () => {
+  /** 重写显示中的点：未冻结区间 [frozen, n]（cellPx 变化/restyle 用） */
+  const redrawDots = () => {
     const s = stateRef.current;
     const spec = specRef.current;
     const n = s.xs.length - 1;
-    if (n < 1) return;
     const headLen = s.lens[n];
-    for (let k = frozenRef.current; k <= n - 1; k++) {
-      writeSeg(
-        k % LIVE_SLOTS,
-        s.xs[k],
-        s.ys[k],
-        s.xs[k + 1],
-        s.ys[k + 1],
-        segStyleAt(spec, s.lens[k + 1], headLen),
-      );
+    for (let k = frozenRef.current; k <= n; k++) {
+      writeDot(k % LIVE_SLOTS, s.xs[k], s.ys[k], segStyleAt(spec, s.lens[k], headLen));
     }
-    writeSeg(
-      n % LIVE_SLOTS,
-      s.xs[n],
-      s.ys[n],
-      ballRef.current.x,
-      ballRef.current.y,
-      segStyleAt(spec, s.lens[n], headLen),
-    );
   };
 
-  /** 重置为单起点：清空静态块与全部段槽（handle.reset 与挂载初始化共用） */
+  /** 重置为单起点：清空静态块与全部点槽（handle.reset 与挂载初始化共用） */
   const resetTo = (x: number, y: number) => {
     stateRef.current = createLivePath(x, y);
     frozenRef.current = 0;
     blocksRef.current = [];
-    ballRef.current = { x, y };
     setBlocks([]);
     for (let i = 0; i < LIVE_SLOTS; i++) {
-      writeSeg(i, 0, 0, 0, 0, { color: specRef.current.monoColor, opacity: 0 });
+      writeDot(i, 0, 0, { color: specRef.current.monoColor, opacity: 0 });
     }
+    // 起点圆点即时可见：轨迹自起点出发（点 0 永不参与补点循环）
+    writeDot(0, x, y, segStyleAt(specRef.current, 0, 0));
   };
 
   useImperativeHandle(ref, () => ({
@@ -170,34 +142,27 @@ function LiveTrailLayerInner(
       resetTo(x, y);
     },
     tick(x, y) {
-      ballRef.current = { x, y };
       const s = stateRef.current;
       const spec = specRef.current;
-      const pushed = pushPoint(s, x, y);
-      const n = s.xs.length - 1;
-      if (pushed) {
-        // 新完整段写入其槽；下一槽（未来的末段槽）先行清空，防上一圈残影
-        writeSeg(
-          (n - 1) % LIVE_SLOTS,
-          s.xs[n - 1],
-          s.ys[n - 1],
-          s.xs[n],
-          s.ys[n],
-          segStyleAt(spec, s.lens[n], s.lens[n]),
-        );
-        writeSeg(n % LIVE_SLOTS, s.xs[n], s.ys[n], x, y, { color: spec.monoColor, opacity: 0 });
-        if (n - frozenRef.current >= FREEZE_AT) freeze();
-      } else {
-        // 末段：最后采样点 → 球（每帧伸长，端点恒贴球）
-        writeSeg(n % LIVE_SLOTS, s.xs[n], s.ys[n], x, y, segStyleAt(spec, s.lens[n], s.lens[n]));
+      const before = s.xs.length;
+      const added = advanceTo(s, x, y);
+      if (added > 0) {
+        const n = s.xs.length - 1;
+        const headLen = s.lens[n];
+        for (let k = before; k <= n; k++) {
+          writeDot(k % LIVE_SLOTS, s.xs[k], s.ys[k], segStyleAt(spec, s.lens[k], headLen));
+        }
+        // while：补点较多时一次追平冻结前沿（每 tick 最多补 ~6 点）
+        while (n - frozenRef.current >= FREEZE_AT) freeze();
       }
       if (spec.trailStyle === 'fade') {
-        // 头部推进使窗口内旧段跨档：只重写透明度实际变化的段（通常每帧 0-2 段）
+        // 头部推进使窗口内旧点跨档：只重写透明度实际变化的点（通常每帧 0-2 个）
+        const n = s.xs.length - 1;
         const headLen = s.lens[n];
-        for (let k = n - 1; k >= frozenRef.current; k--) {
-          const st = segStyleAt(spec, s.lens[k + 1], headLen);
+        for (let k = n; k >= frozenRef.current; k--) {
+          const st = segStyleAt(spec, s.lens[k], headLen);
           if (Math.abs(st.opacity - lastOpacityRef.current[k % LIVE_SLOTS]) > 1e-9) {
-            writeSeg(k % LIVE_SLOTS, s.xs[k], s.ys[k], s.xs[k + 1], s.ys[k + 1], st);
+            writeDot(k % LIVE_SLOTS, s.xs[k], s.ys[k], st);
           }
         }
       }
@@ -215,7 +180,7 @@ function LiveTrailLayerInner(
       }
       blocksRef.current = next;
       setBlocks(next);
-      redrawWindow();
+      redrawDots();
     },
   }));
 
@@ -227,9 +192,9 @@ function LiveTrailLayerInner(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maze]);
 
-  // cellPx 变化（布局/缩放澄清落地）：段为像素直写需全量重写；静态块经 viewBox 与像素解耦
+  // cellPx 变化（布局/缩放澄清落地）：点槽为像素直写需全量重写；静态块经 viewBox 与像素解耦
   useEffect(() => {
-    redrawWindow();
+    redrawDots();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cellPx]);
 
@@ -256,8 +221,8 @@ function LiveTrailLayerInner(
           )),
         )}
       </Svg>
-      {segRefSetters.map((setter, i) => (
-        <View key={i} ref={setter} testID={`trail-seg-${i}`} style={styles.seg} />
+      {dotRefSetters.map((setter, i) => (
+        <View key={i} ref={setter} testID={`trail-dot-${i}`} style={styles.dot} />
       ))}
     </View>
   );
@@ -271,6 +236,6 @@ export default LiveTrailLayer;
 const styles = StyleSheet.create({
   root: { position: 'absolute', left: 0, top: 0 },
   svg: { position: 'absolute', left: 0, top: 0 },
-  // 段池：位置/尺寸/颜色全部由 setNativeProps 直写（style 引用恒定，重渲染不覆盖直写值）
-  seg: { position: 'absolute', left: 0, top: 0, width: 0, height: 0, opacity: 0 },
+  // 点池：位置/尺寸/颜色全部由 setNativeProps 直写（style 引用恒定，重渲染不覆盖直写值）
+  dot: { position: 'absolute', left: 0, top: 0, width: 0, height: 0, opacity: 0 },
 });

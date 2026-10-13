@@ -1,8 +1,10 @@
 /* 轨迹几何回归：端到端（真实 useGameEngine tick）随机行走，
- * 屏幕层同款采样（services/liveTrail）产生"球真实路径折线"，
- * 验证采样折线各段与末段（最后采样点→球）线心深穿 ≤ 0.05 单元内零穿墙。
- * 背景：旧"格中心折线 + 直线尾巴"模型存在固有领先/落后（格边界步进）与斜穿墙角问题，
- * 改为球路径采样后，几何正确性由本测试持续保障。
+ * 屏幕层同款采样（services/liveTrail.advanceTo 插值补点）产生"球真实路径圆点链折线"，
+ * 验证：① 采样折线各段线心深穿 ≤ 0.05 单元内零穿墙；
+ *       ② 相邻点距恒 ≤ LIVE_STEP（圆点串连续重叠，不依赖旋转的"丝滑"下限保证）；
+ *       ③ 端点恒贴球（最后采样点距球 < LIVE_STEP，被球体覆盖）。
+ * 背景：旧"格中心折线 + 直线尾巴"模型存在固有领先/落后（格边界步进）与斜穿墙角问题；
+ * 逐段旋转方案在 Fabric 下直写 rotate 不生效（真机验证），故采用无旋转的圆点链。
  */
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
@@ -12,7 +14,7 @@ import { generateMaze } from '../services/generator';
 import { BASE_CELL_DP } from '../constants';
 import { collidesRect } from '../services/collision';
 import { mulberry32 } from '../services/rng';
-import { createLivePath, pushPoint } from '../services/liveTrail';
+import { LIVE_STEP, advanceTo, createLivePath } from '../services/liveTrail';
 import type { JoyVector, MazeData } from '../types';
 
 type EngineApi = ReturnType<typeof useGameEngine>;
@@ -103,8 +105,8 @@ function segDeepWall(maze: MazeData, x0: number, y0: number, x1: number, y1: num
   return maxRun;
 }
 
-describe('轨迹几何：球真实路径采样', () => {
-  it('随机行走 1500 帧：采样折线与末段（最后采样点→球）零穿墙', async () => {
+describe('轨迹几何：球真实路径圆点链采样', () => {
+  it('随机行走 1500 帧：点距有界、折线零穿墙、端点恒贴球', async () => {
     env = {
       joyRef: { current: { x: 0, y: 0 } },
       camScaleRef: { current: 1 },
@@ -113,20 +115,9 @@ describe('轨迹几何：球真实路径采样', () => {
     const maze = generateMaze(1000000, 'easy');
     const state = createLivePath(2 * maze.start[0] + 1.5, 2 * maze.start[1] + 1.5);
     const violations: string[] = [];
-    let frame = 0;
     const onTick = () => {
       const b = api!.getBall();
-      if (pushPoint(state, b.x, b.y)) {
-        frame++;
-      }
-      // 末段（最后采样点→球当前位置）每帧检查：端点恒贴球的实时延长线
-      const n = state.xs.length - 1;
-      if (n >= 1) {
-        const depth = segDeepWall(maze, state.xs[n], state.ys[n], b.x, b.y);
-        if (depth > 0.05) {
-          violations.push(`f=${frame} 末段 depth=${depth.toFixed(2)}`);
-        }
-      }
+      advanceTo(state, b.x, b.y);
     };
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
@@ -144,16 +135,26 @@ describe('轨迹几何：球真实路径采样', () => {
       env.joyRef.current = { x: dx, y: dy };
       await stepFrames(1);
     }
-    // 全量折线检查（相邻采样点段）
+    // 全量折线检查（相邻采样点段）——插值点均在球真实路径弦上，零穿墙
     for (let k = 0; k + 1 < state.xs.length; k++) {
       const depth = segDeepWall(maze, state.xs[k], state.ys[k], state.xs[k + 1], state.ys[k + 1]);
       if (depth > 0.05) {
         violations.push(`seg ${k} depth=${depth.toFixed(2)}`);
       }
     }
+    expect(violations).toEqual([]);
     // 确认确实产生了足量采样（防 rAF/判据回归导致空走）
     expect(state.xs.length).toBeGreaterThan(100);
-    expect(violations).toEqual([]);
+    // 点距有界：圆点串固定密度重叠（无旋转方案的"丝滑"下限保证）
+    let maxGap = 0;
+    for (let k = 1; k < state.xs.length; k++) {
+      maxGap = Math.max(maxGap, Math.hypot(state.xs[k] - state.xs[k - 1], state.ys[k] - state.ys[k - 1]));
+    }
+    expect(maxGap).toBeLessThanOrEqual(LIVE_STEP * (1 + 1e-9));
+    // 端点恒贴球：最后采样点距球 < LIVE_STEP（被球体覆盖）
+    const b = api!.getBall();
+    const last = state.xs.length - 1;
+    expect(Math.hypot(b.x - state.xs[last], b.y - state.ys[last])).toBeLessThan(LIVE_STEP);
     await ReactTestRenderer.act(() => {
       tree.unmount();
     });

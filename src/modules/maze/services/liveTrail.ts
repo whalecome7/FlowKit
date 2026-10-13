@@ -81,15 +81,26 @@ export function createLivePath(x: number, y: number): LivePathState {
   return { xs: [x], ys: [y], lens: [0] };
 }
 
-/** 追加采样点：距最后点 ≥ LIVE_STEP 才追加；返回是否追加 */
-export function pushPoint(s: LivePathState, x: number, y: number): boolean {
-  const n = s.xs.length - 1;
-  const d = Math.hypot(x - s.xs[n], y - s.ys[n]);
-  if (d < LIVE_STEP) return false;
-  s.xs.push(x);
-  s.ys.push(y);
-  s.lens.push(s.lens[n] + d);
-  return true;
+/**
+ * 向 (x, y) 追加采样点：自最后一点起以 LIVE_STEP 为步长沿直线插值推进，
+ * 每步追加一个点（相邻点距 = LIVE_STEP）；返回本次追加的点数。
+ * 快移帧（一帧位移可达 ~0.36）自动补点，保证点距有界——
+ * 圆点串以固定密度重叠成连续轨迹（点距 ≪ 点直径），不依赖逐段旋转。
+ */
+export function advanceTo(s: LivePathState, x: number, y: number): number {
+  let n = s.xs.length - 1;
+  let added = 0;
+  for (;;) {
+    const dist = Math.hypot(x - s.xs[n], y - s.ys[n]);
+    if (dist < LIVE_STEP) break;
+    const t = LIVE_STEP / dist;
+    s.xs.push(s.xs[n] + (x - s.xs[n]) * t);
+    s.ys.push(s.ys[n] + (y - s.ys[n]) * t);
+    s.lens.push(s.lens[n] + LIVE_STEP);
+    n++;
+    added++;
+  }
+  return added;
 }
 
 /**

@@ -121,7 +121,7 @@ describe('MazeGameScreen', () => {
     });
   });
 
-  it('viewport 渲染实时轨迹层（段池槽位齐全，恰一组）', async () => {
+  it('viewport 渲染实时轨迹层（点池槽位齐全，恰一组）', async () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
@@ -137,14 +137,14 @@ describe('MazeGameScreen', () => {
     await ReactTestRenderer.act(() => {
       viewportNode.props.onLayout({ nativeEvent: { layout: { width: 300, height: 500 } } });
     });
-    // 过滤 host 元素（View 复合组件与 host 层都会带 testID，只应恰有一组段池）
-    const segs = tree.root.findAll(
+    // 过滤 host 元素（View 复合组件与 host 层都会带 testID，只应恰有一组点池）
+    const dots = tree.root.findAll(
       (n) =>
         typeof n.type === 'string' &&
         typeof n.props.testID === 'string' &&
-        n.props.testID.startsWith('trail-seg-'),
+        n.props.testID.startsWith('trail-dot-'),
     );
-    expect(segs).toHaveLength(LIVE_SLOTS);
+    expect(dots).toHaveLength(LIVE_SLOTS);
     await ReactTestRenderer.act(() => {
       tree.unmount();
     });

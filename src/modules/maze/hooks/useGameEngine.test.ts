@@ -20,6 +20,7 @@ function makeEnv() {
     onStart: jest.fn(),
     onEnterCell: jest.fn(),
     onWin: jest.fn(),
+    onTick: jest.fn(),
   };
 }
 type Env = ReturnType<typeof makeEnv>;
@@ -46,6 +47,7 @@ function Harness({ maze, viewport, resetToken, env, onApi }: HarnessProps) {
     onStart: env.onStart,
     onEnterCell: env.onEnterCell,
     onWin: env.onWin,
+    onTick: env.onTick,
   });
   onApi(engine);
   return null;
@@ -298,6 +300,45 @@ describe('useGameEngine 镜头', () => {
       Math.max(fitNew, INITIAL_CELL_DP) / env.cellPxRef.current,
       9,
     );
+  });
+});
+
+describe('useGameEngine 实时回调 onTick（轨迹尾巴线）', () => {
+  it('球移动时触发；静止时不再重复触发（仅视觉位置变化才回调）', async () => {
+    const maze = generateMaze(1234567, 'easy');
+    const { env } = await mountHarness(maze, VIEWPORT);
+
+    // 推杆（起点格可通行方向）→ 球移动 → 每帧直写回调被调用
+    env.joyRef.current = openDirAtStart(maze);
+    await stepFrames(10);
+    expect(env.onTick.mock.calls.length).toBeGreaterThan(0);
+
+    // 松杆静止：消化停住的帧后，继续推帧次数不再增加
+    env.joyRef.current = { x: 0, y: 0 };
+    await stepFrames(5);
+    const callsAfterStop = env.onTick.mock.calls.length;
+    await stepFrames(10);
+    expect(env.onTick.mock.calls.length).toBe(callsAfterStop);
+  });
+
+  it('reset 后立即触发一次 onTick（球回起点，供收起/重置尾巴）', async () => {
+    const maze = generateMaze(1234567, 'easy');
+    const { env, rerender } = await mountHarness(maze, VIEWPORT);
+
+    env.joyRef.current = openDirAtStart(maze);
+    await stepFrames(10);
+    env.joyRef.current = { x: 0, y: 0 };
+    await stepFrames(5);
+    const before = env.onTick.mock.calls.length;
+
+    // resetToken bump → 引擎 reset：球回起点（屏幕位置变化）→ 触发一次
+    await rerender(VIEWPORT, 1);
+    expect(env.onTick.mock.calls.length).toBe(before + 1);
+
+    // reset 后再推杆：恢复调用
+    env.joyRef.current = openDirAtStart(maze);
+    await stepFrames(10);
+    expect(env.onTick.mock.calls.length).toBeGreaterThan(before + 1);
   });
 });
 

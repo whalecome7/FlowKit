@@ -121,6 +121,25 @@ describe('MazeGameScreen', () => {
     });
   });
 
+  it('viewport 渲染实时轨迹尾巴线（trail-tail，恰一条）', async () => {
+    let tree!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(() => {
+      tree = ReactTestRenderer.create(
+        <ThemeProvider>
+          <MazeGameScreen />
+        </ThemeProvider>,
+      );
+    });
+    // 过滤 host 元素（View 复合组件与 host 层都会带 testID，只应恰有一条 host 尾巴线）
+    const tails = tree.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'trail-tail',
+    );
+    expect(tails).toHaveLength(1);
+    await ReactTestRenderer.act(() => {
+      tree.unmount();
+    });
+  });
+
   it('二次进入相同 seed 的记录会重置并显示查看横幅（真引擎链路）', async () => {
     installManualRaf();
     let tree!: ReactTestRenderer.ReactTestRenderer;

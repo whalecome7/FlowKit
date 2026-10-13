@@ -20,6 +20,8 @@ export interface EngineOptions {
   onEnterCell: (cell: CellPoint) => void;
   /** 通关（elapsedMs 为首次移动至今） */
   onWin: (elapsedMs: number) => void;
+  /** 实时直写回调：球的屏幕坐标变化时触发（供轨迹尾巴线等做每帧直写） */
+  onTick?: () => void;
   maze: MazeData;
   joyRef: React.MutableRefObject<JoyVector>;
   ballViewRef: React.RefObject<View | null>;
@@ -55,6 +57,8 @@ export function useGameEngine(opts: EngineOptions) {
   const lastTsRef = useRef(0);
   const appActiveRef = useRef(true);
   const tickRef = useRef<(ts: number) => void>(() => {});
+  /** 上次触发 onTick 时的球屏幕坐标：仅视觉位置变化才触发实时直写（静止时不重复） */
+  const lastTailRef = useRef({ x: NaN, y: NaN });
   // 终点世界坐标（每渲染重算；tick 经 tickRef 始终引用最新闭包）
   const endPos = { x: 2 * maze.end[0] + 1.5, y: 2 * maze.end[1] + 1.5 };
 
@@ -101,6 +105,18 @@ export function useGameEngine(opts: EngineOptions) {
     });
   }
 
+  /**
+   * 实时直写回调（轨迹尾巴线等）：以球的屏幕坐标为基准，仅视觉位置变化才触发。
+   * tick 内每帧检测（球动/镜头跟随）；所有视图重写路径（平移/缩放/重置/布局）同步调用，
+   * 避免"镜头动、球不动"时尾巴线与球错位。updateTail 侧全走 ref/getState，无渲染开销。
+   */
+  function syncTail() {
+    const { sx, sy } = worldToScreen(ball.current.x, ball.current.y);
+    if (sx === lastTailRef.current.x && sy === lastTailRef.current.y) return;
+    lastTailRef.current = { x: sx, y: sy };
+    cbRef.current.onTick?.();
+  }
+
   /** 手动操作：暂停跟随 */
   function manual() {
     followRef.current = false;
@@ -121,6 +137,7 @@ export function useGameEngine(opts: EngineOptions) {
     clampCam();
     writeContainer();
     writeBall();
+    syncTail();
   }
 
   /** 以屏幕点为锚缩放（factor 为本次增量倍率） */
@@ -140,6 +157,7 @@ export function useGameEngine(opts: EngineOptions) {
     clampCam();
     writeContainer();
     writeBall();
+    syncTail();
   }
 
   function clampCam() {
@@ -166,6 +184,7 @@ export function useGameEngine(opts: EngineOptions) {
     camScaleRef.current = 1;
     writeBall();
     writeContainer();
+    syncTail();
   }
 
   /** 镜头跳转到世界坐标（缩略图点击） */
@@ -176,6 +195,7 @@ export function useGameEngine(opts: EngineOptions) {
     manual();
     writeContainer();
     writeBall();
+    syncTail();
   }
 
   /** 初始/重布局缩放：小迷宫全览、大迷宫按初始单元下限 */
@@ -198,6 +218,8 @@ export function useGameEngine(opts: EngineOptions) {
     followHoldRef.current = 0;
     writeBall();
     writeContainer();
+    // 触发一次实时直写（球已回起点；配合屏幕层清空轨迹后收起尾巴线）
+    syncTail();
   }
 
   /** 跟随镜头：死区 30%，出界平滑追踪；手动模式接管与回跟随见 followRef */
@@ -243,6 +265,7 @@ export function useGameEngine(opts: EngineOptions) {
     camScaleRef.current = computeFitScale();
     writeBall();
     writeContainer();
+    syncTail();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport.width, viewport.height]);
 
@@ -281,6 +304,7 @@ export function useGameEngine(opts: EngineOptions) {
       updateCamera(dt);
       writeBall();
       writeContainer();
+      syncTail();
     }
     rafRef.current = requestAnimationFrame(tickRef.current);
   }

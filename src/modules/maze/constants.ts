@@ -50,7 +50,7 @@ export function paletteForSeed(seed: number): Palette {
 
 /** 世界单位与物理（详见设计文档） */
 export const BALL_R = 0.34;
-export const SPEED = 11; // 单元/秒
+export const SPEED = 8; // 单元/秒
 export const JOY_DEAD = 0.12;
 export const END_TOL = 0.6;
 

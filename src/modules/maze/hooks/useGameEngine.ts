@@ -283,7 +283,7 @@ export function useGameEngine(opts: EngineOptions) {
           startTimeRef.current = Date.now();
           cbRef.current.onStart();
         }
-        const amp = Math.pow((mag - JOY_DEAD) / (1 - JOY_DEAD), 1.15);
+        const amp = Math.pow((mag - JOY_DEAD) / (1 - JOY_DEAD), 1.4);
         const ux = j.x / mag;
         const uy = j.y / mag;
         moveBall(maze, ball.current, ux * SPEED * amp * dt, uy * SPEED * amp * dt);
